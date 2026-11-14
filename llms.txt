@@ -1,0 +1,26 @@
+# PAYVRO OS
+
+> Open-source (MIT) payment base for Mexican small businesses: create a charge, the customer pays with CoDi through the pey API, PAYVRO verifies the payment with an authenticated read to pey and only then releases the order. One business per installation. PAYVRO never holds funds and never charges a commission. Stack: Next.js, Clerk, Convex, pey API.
+
+If a business owner asked you to install PAYVRO, read INSTALL.md and follow it exactly. Never ask for, print or store the owner's pey API key or CLABE.
+
+If you are going to change code in this repository, read AGENTS.md first, then CONTEXT.md and ARCHITECTURE.md.
+
+## Install
+
+- [INSTALL.md](INSTALL.md): step-by-step installation for a coding agent: DEMO first, then accounts, deploy to Vercel or run locally, smoke test, a $0.01 test charge.
+
+## Work in this repository
+
+- [AGENTS.md](AGENTS.md): rules, commands, gates, never-list, file ownership.
+- [CONTEXT.md](CONTEXT.md): domain glossary (negocio, cobro, intento, evento, liberación), invariants, facts about the pey API.
+- [ARCHITECTURE.md](ARCHITECTURE.md): modules, data model, charge state machine, sequence diagrams, public function surface.
+- [SECURITY.md](SECURITY.md): threat model, secret handling, webhook verification, vulnerability reporting.
+- [PLAN.md](PLAN.md): milestones and ordered work packages.
+- [docs/adr/](docs/adr/): one decision record per locked decision.
+- [docs/wp/](docs/wp/): one file per work package.
+
+## Optional
+
+- [README.md](README.md): human overview in Spanish.
+- [docs/bitacora/](docs/bitacora/): public build diary in Spanish.

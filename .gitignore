@@ -1,0 +1,52 @@
+# dependencies
+node_modules/
+.pnp.*
+.yarn/
+
+# Next.js
+.next/
+out/
+next-env.d.ts
+
+# Convex (generated code IS committed: convex/_generated/)
+.convex/
+
+# build and test output
+dist/
+build/
+coverage/
+*.tsbuildinfo
+playwright-report/
+test-results/
+blob-report/
+.playwright/
+
+# environment: names live in .env.example, values never enter git
+.env
+.env.*
+!.env.example
+
+# Vercel
+.vercel/
+
+# logs
+*.log
+npm-debug.log*
+
+# editors and OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# agent and factory scratch (never committed)
+.review/
+.worktrees/
+.claude/
+.cursor/
+.pi/
+*.local.md
+
+# evidence that may contain payer or account data stays out of git
+evidence/private/
