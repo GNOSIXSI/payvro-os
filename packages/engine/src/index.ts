@@ -1,3 +1,11 @@
 export { aCentavos, aPesos, MONTO_MAX_CENTAVOS, MONTO_MIN_CENTAVOS } from "./money";
 export { esId, nuevoId, PREFIJOS_ID } from "./ids";
 export type { PrefijoId } from "./ids";
+export { transicionarCobro, transicionarIntento, transicionesCobro, transicionesIntento } from "./estados";
+export type { EstadoCobro, EventoCobro, EstadoIntento, EventoIntento } from "./estados";
+export { evaluar } from "./verificacion";
+export type { Esperado, Evidencia, Veredicto, MotivoRevision } from "./verificacion";
+export { crearSimulador } from "./pey/simulador";
+export type { VariantePago, SimStore } from "./pey/simulador";
+export type { PeyPuerto, ResultadoCrear } from "./pey/puerto";
+export type { TransaccionPey, EvidenciaLink, PaginaTransacciones } from "./pey/tipos";
