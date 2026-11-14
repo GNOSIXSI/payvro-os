@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PAYVRO Cloud · Pantallas y UX</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Display:wght@500;700&family=Noto+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: banco de trabajo (indice a la izquierda, lienzo al centro) que enmarca el producto real en un contenedor con ancho de dispositivo. */
+:root{
+  color-scheme:light;
+  --ink:#142B3B; --paper:#F5F3EC; --pet:#076B76; --pet-h:#055A63; --pet-soft:#E4F1F1;
+  --teal:#00B8B2; --mag:#EF006D; --yel:#FFC400; --ora:#FF7900;
+  --mut:#50636E; --line:#D7DEDE; --card:#FFFFFF; --bench:#E9E6DB; --field:#FBFAF6;
+  --wait-bg:#FFF2C2; --wait-fg:#5A4300; --wait-bd:#E2BE45;
+  --ok-bg:#D6F2F0; --ok-fg:#04575F; --ok-bd:#8ED6D2;
+  --rev-bg:#FFE4CC; --rev-fg:#7A3500; --rev-bd:#F2B27A;
+  --exp-bg:#E9ECEC; --exp-fg:#3F4F58; --exp-bd:#C3CCCC;
+  --err:#A4241C; --err-bg:#FBE9E7;
+  --hd:"Noto Sans Display","Noto Sans",system-ui,sans-serif;
+  --bd:"Noto Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --r:12px; --r-sm:8px; --ease:cubic-bezier(.2,.7,.2,1);
+  --sh:0 1px 2px rgba(20,43,59,.06),0 8px 24px rgba(20,43,59,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bench);color:var(--ink);font-family:var(--bd);font-size:16px;line-height:1.5}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:0}
+a{color:var(--pet)}
+h1,h2,h3,h4{font-family:var(--hd);font-weight:700;line-height:1.15;letter-spacing:-.01em;text-wrap:balance}
+:focus-visible{outline:3px solid var(--pet);outline-offset:2px;border-radius:4px}
+.dark :focus-visible{outline-color:#fff}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.num{font-variant-numeric:tabular-nums}
+svg.i{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.logo svg{display:block;height:100%;width:auto;aspect-ratio:787.963/160}
+.iso svg{display:block;height:100%;width:auto;aspect-ratio:1}
+
+/* ---------- banco de trabajo ---------- */
+#bench{display:grid;grid-template-columns:264px 1fr;grid-template-rows:auto 1fr;height:100%}
+#top{grid-column:1/-1;background:var(--ink);color:var(--paper);display:flex;align-items:center;gap:16px;padding:10px 16px;flex-wrap:wrap}
+#top .logo{height:22px}
+#top .ttl{font-size:14px;color:#C9D3D9}
+#top .sp{flex:1}
+.seg{display:inline-flex;border:1px solid rgba(255,255,255,.28);border-radius:999px;padding:2px}
+.seg button{font-size:13px;font-weight:600;padding:6px 12px;border-radius:999px;color:#C9D3D9;min-height:32px}
+.seg button[aria-pressed=true]{background:var(--paper);color:var(--ink)}
+.ctl{display:flex;align-items:center;gap:6px;font-size:12px;color:#C9D3D9}
+#idx{background:#F0EDE3;border-right:1px solid var(--line);overflow:auto;padding:12px 8px}
+#idx h2{font-size:12px;font-family:var(--bd);letter-spacing:.08em;text-transform:uppercase;color:var(--mut);padding:8px}
+#idx a{display:flex;gap:10px;align-items:baseline;padding:8px;border-radius:var(--r-sm);text-decoration:none;color:var(--ink);font-size:14px}
+#idx a:hover{background:#E6E2D6}
+#idx a[aria-current=page]{background:var(--ink);color:var(--paper)}
+#idx a .n{font-size:12px;color:var(--mut);width:18px;flex:none}
+#idx a[aria-current=page] .n{color:#9FB1BC}
+#idxsel{display:none}
+#work{overflow:auto;padding:20px 24px 48px;min-width:0}
+.whead{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;margin-bottom:10px}
+.whead h1{font-size:22px}
+.whead .who{font-size:13px;color:var(--mut)}
+.states{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;align-items:center}
+.states .lab{font-size:12px;color:var(--mut);letter-spacing:.06em;text-transform:uppercase;margin-right:4px}
+.states button{font-size:13px;padding:5px 12px;border:1px solid #C9C5B7;border-radius:999px;background:#F7F5EE;min-height:32px}
+.states button[aria-pressed=true]{background:var(--ink);color:var(--paper);border-color:var(--ink);font-weight:600}
+.frame{margin:0 auto;background:var(--paper);border-radius:14px;box-shadow:var(--sh);overflow:hidden;border:1px solid #CFCBBE;transition:max-width .2s var(--ease)}
+.frame[data-dev=desktop]{max-width:1200px}
+.frame[data-dev=tablet]{max-width:820px}
+.frame[data-dev=mobile]{max-width:390px;border-radius:28px;border:8px solid var(--ink)}
+.stage{container-type:inline-size;container-name:st;min-height:560px;background:var(--paper);position:relative}
+.notes{max-width:1200px;margin:20px auto 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.notes div{background:#F7F5EE;border:1px solid #D9D5C8;border-left:4px solid var(--pet);border-radius:var(--r-sm);padding:10px 12px;font-size:14px}
+.notes b{display:block;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--pet);margin-bottom:2px}
+@media (max-width:900px){
+  #bench{grid-template-columns:1fr}
+  #idx{display:none}
+  #idxsel{display:block;background:var(--ink);color:var(--paper);border:1px solid rgba(255,255,255,.3);border-radius:var(--r-sm);padding:6px 8px;font-size:14px;max-width:100%}
+  #work{padding:16px 16px 40px}
+}
+
+/* ---------- componentes del producto ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:10px 16px;border-radius:var(--r);font-weight:600;font-size:15px;background:var(--pet);color:#fff;border:1px solid var(--pet);text-decoration:none;transition:background .16s var(--ease)}
+.btn:hover{background:var(--pet-h)}
+.btn.sec{background:#fff;color:var(--pet)}
+.btn.sec:hover{background:var(--pet-soft)}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--pet)}
+.btn.ghost:hover{background:var(--pet-soft)}
+.btn.danger{background:#fff;color:var(--err);border-color:#D9A19C}
+.btn.sm{min-height:36px;padding:6px 12px;font-size:14px;border-radius:10px}
+.btn.lg{min-height:52px;font-size:17px;padding:12px 22px}
+.btn.block{width:100%}
+.btn[aria-disabled=true]{opacity:.55;cursor:not-allowed}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:20px}
+.badge{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;padding:3px 10px 3px 8px;border-radius:999px;border:1px solid transparent;white-space:nowrap}
+.b-wait{background:var(--wait-bg);color:var(--wait-fg);border-color:var(--wait-bd)}
+.b-ok{background:var(--ok-bg);color:var(--ok-fg);border-color:var(--ok-bd)}
+.b-lib{background:var(--pet);color:#fff}
+.b-rev{background:var(--rev-bg);color:var(--rev-fg);border-color:var(--rev-bd)}
+.b-exp{background:var(--exp-bg);color:var(--exp-fg);border-color:var(--exp-bd)}
+.tag{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;letter-spacing:.05em;padding:2px 7px;border-radius:6px;background:var(--ink);color:#fff;text-transform:uppercase;vertical-align:middle}
+.tag.pro{background:var(--pet)}
+.tag.out{background:#fff;color:var(--ink);border:1px solid var(--line)}
+.tag.demo{background:var(--yel);color:var(--ink)}
+.fld{display:flex;flex-direction:column;gap:4px;font-size:14px;font-weight:600}
+.fld .hint{font-weight:400;color:var(--mut);font-size:13px}
+.fld .err{font-weight:600;color:var(--err);font-size:13px;display:flex;gap:6px;align-items:center}
+.inp{min-height:44px;padding:10px 12px;border:1px solid #B9C4C4;border-radius:var(--r-sm);background:var(--field);font-weight:400;font-size:16px;width:100%}
+.inp[aria-invalid=true]{border-color:var(--err);background:var(--err-bg)}
+.inp.big{font-family:var(--hd);font-size:28px;font-weight:700}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.col{display:flex;flex-direction:column;gap:12px}
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}.g4{grid-template-columns:repeat(4,1fr)}
+.mut{color:var(--mut)}.small{font-size:13px}.sp{flex:1}
+.alert{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:var(--r-sm);border:1px solid var(--line);background:#fff;font-size:14px}
+.alert.rev{background:var(--rev-bg);border-color:var(--rev-bd);color:var(--rev-fg)}
+.alert.err{background:var(--err-bg);border-color:#E2B1AC;color:var(--err)}
+.alert.info{background:var(--pet-soft);border-color:#B5D8D9;color:#04474E}
+.alert svg.i{margin-top:3px}
+.demo-bar{background:var(--ink);color:var(--paper);font-size:13px;padding:6px 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);overflow-x:auto}
+.tabs button{padding:10px 12px;font-size:14px;font-weight:600;color:var(--mut);border-bottom:3px solid transparent;white-space:nowrap;min-height:44px}
+.tabs button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--pet)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--mut);font-weight:600;padding:8px 10px;border-bottom:1px solid var(--line)}
+td{padding:10px;border-bottom:1px solid #ECEEEE;vertical-align:middle}
+td.r,th.r{text-align:right}
+.tw{overflow-x:auto}
+.qr{background:#fff;border:1px solid var(--line);border-radius:var(--r-sm);padding:10px;display:inline-block;line-height:0}
+.qr svg{display:block;width:100%;height:auto}
+
+/* shell de la app del dueno */
+.app{display:grid;grid-template-columns:208px 1fr;min-height:640px}
+.side{background:var(--ink);color:#C9D3D9;padding:16px 10px;display:flex;flex-direction:column;gap:2px}
+.side .logo{height:20px;margin:4px 8px 18px}
+.side button{display:flex;gap:10px;align-items:center;padding:9px 10px;border-radius:var(--r-sm);font-size:15px;color:#C9D3D9;text-align:left;min-height:40px}
+.side button:hover{background:rgba(255,255,255,.08)}
+.side button[aria-current=page]{background:rgba(255,255,255,.14);color:#fff;font-weight:600}
+.side .foot{margin-top:auto;font-size:12px;padding:8px;color:#9FB1BC}
+.main{min-width:0;display:flex;flex-direction:column}
+.bar{display:flex;gap:12px;align-items:center;padding:12px 20px;border-bottom:1px solid var(--line);background:#fff;flex-wrap:wrap}
+.bar .biz{display:flex;gap:10px;align-items:center;font-weight:600}
+.av{width:32px;height:32px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-family:var(--hd);font-weight:700;flex:none}
+.body{padding:20px;display:flex;flex-direction:column;gap:16px}
+.body h2{font-size:24px}
+.tabbar{display:none}
+.kpis .card{padding:14px 16px}
+.kpis .v{font-family:var(--hd);font-weight:700;font-size:26px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font-size:13px;font-weight:600;padding:6px 12px;border-radius:999px;border:1px solid #B9C4C4;background:#fff;min-height:36px}
+.chip[aria-pressed=true]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.rowbtn{display:contents}
+tr.click{cursor:pointer}
+tr.click:hover td{background:#F4F7F7}
+.clist{display:none;flex-direction:column;gap:8px}
+.clist button{text-align:left;display:flex;flex-direction:column;gap:6px;background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:12px}
+.tl{list-style:none;display:flex;flex-direction:column}
+.tl li{display:grid;grid-template-columns:28px 1fr;gap:10px;padding-bottom:16px;position:relative}
+.tl li::before{content:"";position:absolute;left:13px;top:26px;bottom:0;width:2px;background:var(--line)}
+.tl li:last-child::before{display:none}
+.tl .dot{width:28px;height:28px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:var(--pet);color:#fff}
+.tl li.cur .dot{background:var(--wait-bg);color:var(--wait-fg);border:1px solid var(--wait-bd)}
+.tl li.rev .dot{background:var(--rev-bg);color:var(--rev-fg);border:1px solid var(--rev-bd)}
+.tl li.exp .dot{background:var(--exp-bg);color:var(--exp-fg);border:1px solid var(--exp-bd)}
+.tl li.todo .dot{background:#fff;border:2px dashed #B9C4C4;color:var(--mut)}
+.tl li.todo{color:var(--mut)}
+.tl b{display:block}
+.tl span.t{font-size:13px;color:var(--mut)}
+.split{display:grid;grid-template-columns:1.15fr .85fr;gap:16px;align-items:start}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;font-size:14px}
+.kv dt{color:var(--mut)}
+.kv dd{font-weight:600;text-align:right}
+.steps{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--mut);flex-wrap:wrap}
+.steps span{display:inline-flex;gap:6px;align-items:center}
+.steps i{width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-style:normal;font-weight:700;font-size:12px;border:1px solid #B9C4C4;background:#fff;color:var(--mut)}
+.steps .on{color:var(--ink);font-weight:600}.steps .on i{background:var(--ink);color:#fff;border-color:var(--ink)}
+.steps .ok i{background:var(--pet);color:#fff;border-color:var(--pet)}
+.opt{display:flex;gap:12px;align-items:flex-start;text-align:left;border:1px solid #B9C4C4;border-radius:var(--r);padding:14px;background:#fff;width:100%}
+.opt[aria-pressed=true],.opt[aria-checked=true]{border-color:var(--pet);box-shadow:inset 0 0 0 1px var(--pet);background:var(--pet-soft)}
+.opt b{display:block}.opt span{font-size:13px;color:var(--mut)}
+.center{max-width:520px;margin:0 auto;padding:32px 20px;display:flex;flex-direction:column;gap:16px}
+.sw{display:flex;gap:8px}
+.sw button{width:36px;height:36px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px #B9C4C4}
+.sw button[aria-pressed=true]{box-shadow:0 0 0 3px var(--ink)}
+.plan{display:flex;flex-direction:column;gap:10px}
+.plan ul{list-style:none;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.plan li{display:flex;gap:8px;align-items:flex-start}
+.plan li svg.i{color:var(--pet);margin-top:3px}
+.plan.cur{border:2px solid var(--pet)}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.pad button{min-height:68px;border-radius:var(--r);background:#fff;border:1px solid #B9C4C4;font-family:var(--hd);font-weight:700;font-size:26px}
+.pad button:active{background:var(--pet-soft)}
+.amt{font-family:var(--hd);font-weight:700;font-size:56px;line-height:1.05}
+.lock{position:relative}
+.overlay{position:fixed;inset:0;background:rgba(20,43,59,.5);display:flex;align-items:center;justify-content:center;padding:16px;z-index:20}
+.dlg{background:#fff;border-radius:16px;padding:24px;max-width:440px;width:100%;display:flex;flex-direction:column;gap:12px;box-shadow:0 20px 60px rgba(20,43,59,.35)}
+.dlg h3{font-size:22px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:999px;font-size:14px;z-index:30;max-width:calc(100% - 32px);text-align:center}
+.pulse{width:10px;height:10px;border-radius:50%;background:currentColor;animation:pl 1.2s ease-out infinite}
+@keyframes pl{0%{opacity:1}50%{opacity:.25}100%{opacity:1}}
+.spin{width:28px;height:28px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--pet);animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+
+/* landing */
+.ld-nav{display:flex;gap:20px;align-items:center;padding:16px 32px;background:var(--paper);border-bottom:1px solid var(--line)}
+.ld-nav .logo{height:26px}
+.ld-nav a.l{font-size:15px;color:var(--ink);text-decoration:none;font-weight:600}
+.ld-sec{padding:56px 32px;max-width:1120px;margin:0 auto}
+.ld-sec h2{font-size:34px;max-width:720px;margin-bottom:8px}
+.ld-sec .lead{font-size:18px;color:var(--mut);max-width:680px;margin-bottom:24px}
+.eyebrow{font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--pet);margin-bottom:8px}
+.hero{display:grid;grid-template-columns:1.1fr .9fr;gap:40px;align-items:center}
+.hero h1{font-size:56px}
+.hero p.lead{font-size:19px;color:var(--mut);margin:16px 0 24px;max-width:560px}
+.kn{width:32px;height:32px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-family:var(--hd);font-weight:700;color:var(--ink);flex:none}
+.k1{background:var(--teal)}.k2{background:var(--mag);color:#fff}.k3{background:var(--yel)}.k4{background:var(--ora)}
+.band{background:var(--ink);color:var(--paper)}
+.band .mut{color:#C9D3D9}
+.chat{background:#EFEBE0;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.chat .h{background:var(--ink);color:#fff;padding:10px 14px;font-size:14px;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+.chat .m{padding:14px;display:flex;flex-direction:column;gap:8px}
+.bub{max-width:84%;padding:8px 14px;border-radius:12px;font-size:15px;background:#fff;border:1px solid var(--line)}
+.bub.me{align-self:flex-end;background:#DDE8D6;border-color:#C5D5BC}
+.shot{margin-top:6px;border:1px dashed #9AA4A8;border-radius:8px;height:64px;display:flex;align-items:center;justify-content:center;font-size:12px;color:#5B6870;background:repeating-linear-gradient(0deg,#F4F4F1 0 10px,#EBEBE6 10px 12px)}
+details.faq{border-bottom:1px solid var(--line);padding:14px 0}
+details.faq summary{font-family:var(--hd);font-weight:700;font-size:18px;cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:12px}
+details.faq summary::after{content:"+";font-size:22px;line-height:1;color:var(--pet)}
+details.faq[open] summary::after{content:"–"}
+details.faq p{margin-top:8px;color:var(--mut);max-width:680px}
+
+/* ---------- respuesta al ancho del contenedor (escritorio / tablet / movil) ---------- */
+@container st (max-width:860px){
+  .g4{grid-template-columns:1fr 1fr}
+  .hero{grid-template-columns:1fr}
+  .split{grid-template-columns:1fr}
+  .ld-nav a.l{display:none}
+}
+@container st (max-width:600px){
+  .app{grid-template-columns:1fr}
+  .side{display:none}
+  .tabbar{display:grid;grid-template-columns:repeat(5,1fr);position:sticky;bottom:0;background:#fff;border-top:1px solid var(--line);margin-top:auto}
+  .tabbar button{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;padding:8px 2px;color:var(--mut);min-height:52px}
+  .tabbar button[aria-current=page]{color:var(--pet);font-weight:700}
+  .g2,.g3,.g4{grid-template-columns:1fr}
+  .kpis{grid-template-columns:1fr 1fr}
+  .kpis .card:first-child{grid-column:1/-1}
+  .body{padding:16px}
+  .bar{padding:10px 16px}
+  .tw.resp{display:none}
+  .clist{display:flex}
+  .hero h1{font-size:38px}
+  .ld-sec{padding:36px 16px}
+  .ld-sec h2{font-size:28px}
+  .ld-nav{padding:12px 16px;gap:10px}
+  .ld-nav .hide-m{display:none}
+  .amt{font-size:44px}
+  .body h2{font-size:22px}
+  .bar .hide-m{display:none}
+}
+
+.sk{display:block;border-radius:6px;background:#DDE2E2;animation:pl 1.2s ease-out infinite}
+::placeholder{color:#5F7079;opacity:1}
+.chk{display:flex;gap:10px;align-items:flex-start;font-size:14px;cursor:pointer}
+.chk input{width:22px;height:22px;margin-top:2px;accent-color:var(--pet);flex:none}
+.tag.pv{background:#fff;color:var(--rev-fg);border:1px dashed #C77A3A}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px}
+.tw:focus-visible{outline-offset:-2px}
+.split>*,.grid>*,.app>*{min-width:0}
+.kn{font-size:19px}
+.alert.neu{background:var(--exp-bg);border-color:var(--exp-bd);color:var(--exp-fg)}
+.center>.badge,.center>.tag{align-self:flex-start}
+.ld-nav a.l{padding:10px 4px}
+</style>
+</head>
+<body>
+<div id="bench">
+  <header id="top" class="dark">
+    <span class="logo"><svg role="img" aria-label="PAYVRO" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 787.963 160"><path fill="#F5F3EC" d="M76.42857142857143 0.0H55.71428571428571Q52.85714285714286 0.0 52.85714285714286 2.8571428571428577V15.714285714285714H40.0Q37.14285714285714 15.714285714285714 37.14285714285714 18.57142857142857V30.0H27.14285714285714Q24.285714285714285 30.0 24.285714285714285 32.857142857142854V44.285714285714285H18.57142857142857C7.142857142857144 44.285714285714285 0.0 54.28571428571429 0.0 65.71428571428571V76.42857142857143L52.85714285714286 72.14285714285714C62.14285714285714 71.42857142857143 67.85714285714286 67.85714285714286 70.0 60.71428571428571L76.42857142857143 0.0Z"/><path fill="#F5F3EC" d="M160.00000000000003 76.42857142857143V55.71428571428571Q160.00000000000003 52.85714285714286 157.14285714285717 52.85714285714286H144.2857142857143V40.0Q144.2857142857143 37.14285714285714 141.42857142857144 37.14285714285714H130.00000000000003V27.14285714285714Q130.00000000000003 24.285714285714285 127.14285714285715 24.285714285714285H115.71428571428571V18.57142857142857C115.71428571428571 7.142857142857144 105.71428571428571 0.0 94.28571428571429 0.0H83.57142857142857L87.85714285714286 52.85714285714286C88.57142857142857 62.14285714285714 92.14285714285714 67.85714285714286 99.28571428571429 70.0L160.00000000000003 76.42857142857143Z"/><path fill="#F5F3EC" d="M83.57142857142857 160.00000000000003H104.28571428571429Q107.14285714285714 160.00000000000003 107.14285714285714 157.14285714285717V144.2857142857143H120.00000000000001Q122.85714285714285 144.2857142857143 122.85714285714285 141.42857142857144V130.00000000000003H132.85714285714286Q135.71428571428572 130.00000000000003 135.71428571428572 127.14285714285715V115.71428571428571H141.42857142857144C152.85714285714286 115.71428571428571 160.00000000000003 105.71428571428571 160.00000000000003 94.28571428571429V83.57142857142857L107.14285714285714 87.85714285714286C97.85714285714286 88.57142857142857 92.14285714285714 92.14285714285714 90.0 99.28571428571429L83.57142857142857 160.00000000000003Z"/><path fill="#F5F3EC" d="M0.0 83.57142857142857V104.28571428571429Q0.0 107.14285714285714 2.8571428571428577 107.14285714285714H15.714285714285714V120.00000000000001Q15.714285714285714 122.85714285714285 18.57142857142857 122.85714285714285H30.0V132.85714285714286Q30.0 135.71428571428572 32.857142857142854 135.71428571428572H44.285714285714285V141.42857142857144C44.285714285714285 152.85714285714286 54.28571428571429 160.00000000000003 65.71428571428571 160.00000000000003H76.42857142857143L72.14285714285714 107.14285714285714C71.42857142857143 97.85714285714286 67.85714285714286 92.14285714285714 60.71428571428571 90.0L0.0 83.57142857142857Z"/><path fill="#F5F3EC" d="M200.0 32.129115558424786H240.9224015493867Q259.17417688831506 32.129115558424786 268.9404777275662 40.230342156229824Q278.7067785668173 48.33156875403485 278.7067785668173 63.317236927049706Q278.7067785668173 78.36694641704324 268.9404777275662 86.46817301484828Q259.17417688831506 94.56939961265331 240.9224015493867 94.56939961265331H224.65590703679794V127.74280180761781H200.0V32.129115558424786ZM224.65590703679794 49.996642995480954V76.70187217559715H238.29670755326018Q245.4693350548741 76.70187217559715 249.37585539057457 73.21162040025823Q253.282375726275 69.7213686249193 253.282375726275 63.317236927049706Q253.282375726275 56.913105229180104 249.37585539057457 53.45487411233053Q245.4693350548741 49.996642995480954 238.29670755326018 49.996642995480954H224.65590703679794ZM354.1474499677211 110.32356358941252H315.59457714654616L309.51065203357007 127.74280180761781H284.72666236281475L320.14151065203356 32.129115558424786H349.536475145255L384.95132343447386 127.74280180761781H360.1673337637185L354.1474499677211 110.32356358941252ZM321.74254357650096 92.58411878631375H347.9354422207876L334.87101355713367 54.543576500968356L321.74254357650096 92.58411878631375ZM384.31091026468687 32.129115558424786H411.27230471271787L433.0463524854745 66.19909619109102L454.8204002582311 32.129115558424786H481.84583602324085L445.40632666236286 87.46081342801807V127.74280180761781H420.75041962556486V87.46081342801807L384.31091026468687 32.129115558424786ZM481.2054228534538 32.129115558424786H505.9894125242091L531.3497740477727 102.7026468689477L556.6460942543576 32.129115558424786H581.430083925113L546.0152356358941 127.74280180761781H516.6202711426727L481.2054228534538 32.129115558424786ZM629.1408650742414 74.52446739832149Q636.8898644286636 74.52446739832149 640.2520335700452 71.64260813428018Q643.6142027114267 68.76074887023886 643.6142027114267 62.164493221433176Q643.6142027114267 55.632278889606184 640.2520335700452 52.81446094254356Q636.8898644286636 49.996642995480954 629.1408650742414 49.996642995480954H618.7661717236927V74.52446739832149H629.1408650742414ZM618.7661717236927 91.5594577146546V127.74280180761781H594.1102646868948V32.129115558424786H631.766559070368Q650.6587475790833 32.129115558424786 659.464428663654 38.469205939315685Q668.2701097482246 44.80929632020657 668.2701097482246 58.51413815364751Q668.2701097482246 67.9922530664945 663.6911555842479 74.07617817947062Q659.1122014202712 80.16010329244673 649.8902517753389 83.04196255648804Q654.9495158166559 84.19470626210457 658.9520981278245 88.26132989025177Q662.9546804389929 92.32795351839896 667.0533247256294 100.58928340865073L680.4379599741769 127.74280180761781H654.1810200129115L642.5255003227888 103.98347320852162Q639.0032278889606 96.81084570690767 635.3848934796642 94.18515171078114Q631.766559070368 91.5594577146546 625.7466752743705 91.5594577146546H618.7661717236927ZM738.7795997417688 48.26752743705616Q727.5083279535183 48.26752743705616 721.2963202065848 56.592898644286635Q715.0843124596513 64.9182698515171 715.0843124596513 80.03202065848933Q715.0843124596513 95.08173014848288 721.2963202065848 103.40710135571335Q727.5083279535183 111.73247256294383 738.7795997417688 111.73247256294383Q750.114912846998 111.73247256294383 756.3269205939315 103.40710135571335Q762.538928340865 95.08173014848288 762.538928340865 80.03202065848933Q762.538928340865 64.9182698515171 756.3269205939315 56.592898644286635Q750.114912846998 48.26752743705616 738.7795997417688 48.26752743705616ZM738.7795997417688 30.39999999999999Q761.8344738540994 30.39999999999999 774.8989025177534 43.59251129761135Q787.9633311814073 56.78502259522271 787.9633311814073 80.03202065848933Q787.9633311814073 103.21497740477727 774.8989025177534 116.40748870238863Q761.8344738540994 129.6 738.7795997417688 129.6Q715.788766946417 129.6 702.6923176242736 116.40748870238863Q689.5958683021304 103.21497740477727 689.5958683021304 80.03202065848933Q689.5958683021304 56.78502259522271 702.6923176242736 43.59251129761135Q715.788766946417 30.39999999999999 738.7795997417688 30.39999999999999Z"/></svg></span>
+    <span class="ttl">Pantallas y lógica de UX</span>
+    <select id="idxsel" aria-label="Ir a pantalla"></select>
+    <span class="sp"></span>
+    <div class="ctl"><span id="lb-ed">Edición</span>
+      <div class="seg" role="group" aria-labelledby="lb-ed" id="edseg">
+        <button type="button" id="ed-cloud" data-ed="cloud">Cloud</button>
+        <button type="button" id="ed-os" data-ed="os">OS</button>
+      </div>
+    </div>
+    <div class="ctl"><span id="lb-dev">Vista</span>
+      <div class="seg" role="group" aria-labelledby="lb-dev" id="devseg">
+        <button type="button" id="dev-desktop" data-dev="desktop">Escritorio</button>
+        <button type="button" id="dev-tablet" data-dev="tablet">Tablet</button>
+        <button type="button" id="dev-mobile" data-dev="mobile">Móvil</button>
+      </div>
+    </div>
+    <div class="ctl"><span id="lb-plan">Plan</span>
+      <div class="seg" role="group" aria-labelledby="lb-plan" id="planseg">
+        <button type="button" id="pl-gratis" data-plan="gratis">Gratis</button>
+        <button type="button" id="pl-pro" data-plan="pro">Pro</button>
+        <button type="button" id="pl-business" data-plan="business">Business</button>
+      </div>
+    </div>
+    <div class="ctl"><span id="lb-demo">Cuenta</span>
+      <div class="seg" role="group" aria-labelledby="lb-demo" id="demoseg">
+        <button type="button" id="dm-1" data-demo="1">DEMO</button>
+        <button type="button" id="dm-0" data-demo="0">Validada</button>
+      </div>
+    </div>
+  </header>
+  <nav id="idx" aria-label="Índice de pantallas"></nav>
+  <main id="work"></main>
+</div>
+
+<script>
+(function(){
+'use strict';
+var LOGO_CLARO='<svg role="img" aria-label="PAYVRO" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 787.963 160"><path fill="#00B8B2" d="M76.42857142857143 0.0H55.71428571428571Q52.85714285714286 0.0 52.85714285714286 2.8571428571428577V15.714285714285714H40.0Q37.14285714285714 15.714285714285714 37.14285714285714 18.57142857142857V30.0H27.14285714285714Q24.285714285714285 30.0 24.285714285714285 32.857142857142854V44.285714285714285H18.57142857142857C7.142857142857144 44.285714285714285 0.0 54.28571428571429 0.0 65.71428571428571V76.42857142857143L52.85714285714286 72.14285714285714C62.14285714285714 71.42857142857143 67.85714285714286 67.85714285714286 70.0 60.71428571428571L76.42857142857143 0.0Z"/><path fill="#EF006D" d="M160.00000000000003 76.42857142857143V55.71428571428571Q160.00000000000003 52.85714285714286 157.14285714285717 52.85714285714286H144.2857142857143V40.0Q144.2857142857143 37.14285714285714 141.42857142857144 37.14285714285714H130.00000000000003V27.14285714285714Q130.00000000000003 24.285714285714285 127.14285714285715 24.285714285714285H115.71428571428571V18.57142857142857C115.71428571428571 7.142857142857144 105.71428571428571 0.0 94.28571428571429 0.0H83.57142857142857L87.85714285714286 52.85714285714286C88.57142857142857 62.14285714285714 92.14285714285714 67.85714285714286 99.28571428571429 70.0L160.00000000000003 76.42857142857143Z"/><path fill="#FFC400" d="M83.57142857142857 160.00000000000003H104.28571428571429Q107.14285714285714 160.00000000000003 107.14285714285714 157.14285714285717V144.2857142857143H120.00000000000001Q122.85714285714285 144.2857142857143 122.85714285714285 141.42857142857144V130.00000000000003H132.85714285714286Q135.71428571428572 130.00000000000003 135.71428571428572 127.14285714285715V115.71428571428571H141.42857142857144C152.85714285714286 115.71428571428571 160.00000000000003 105.71428571428571 160.00000000000003 94.28571428571429V83.57142857142857L107.14285714285714 87.85714285714286C97.85714285714286 88.57142857142857 92.14285714285714 92.14285714285714 90.0 99.28571428571429L83.57142857142857 160.00000000000003Z"/><path fill="#FF7900" d="M0.0 83.57142857142857V104.28571428571429Q0.0 107.14285714285714 2.8571428571428577 107.14285714285714H15.714285714285714V120.00000000000001Q15.714285714285714 122.85714285714285 18.57142857142857 122.85714285714285H30.0V132.85714285714286Q30.0 135.71428571428572 32.857142857142854 135.71428571428572H44.285714285714285V141.42857142857144C44.285714285714285 152.85714285714286 54.28571428571429 160.00000000000003 65.71428571428571 160.00000000000003H76.42857142857143L72.14285714285714 107.14285714285714C71.42857142857143 97.85714285714286 67.85714285714286 92.14285714285714 60.71428571428571 90.0L0.0 83.57142857142857Z"/><path fill="#142B3B" d="M200.0 32.129115558424786H240.9224015493867Q259.17417688831506 32.129115558424786 268.9404777275662 40.230342156229824Q278.7067785668173 48.33156875403485 278.7067785668173 63.317236927049706Q278.7067785668173 78.36694641704324 268.9404777275662 86.46817301484828Q259.17417688831506 94.56939961265331 240.9224015493867 94.56939961265331H224.65590703679794V127.74280180761781H200.0V32.129115558424786ZM224.65590703679794 49.996642995480954V76.70187217559715H238.29670755326018Q245.4693350548741 76.70187217559715 249.37585539057457 73.21162040025823Q253.282375726275 69.7213686249193 253.282375726275 63.317236927049706Q253.282375726275 56.913105229180104 249.37585539057457 53.45487411233053Q245.4693350548741 49.996642995480954 238.29670755326018 49.996642995480954H224.65590703679794ZM354.1474499677211 110.32356358941252H315.59457714654616L309.51065203357007 127.74280180761781H284.72666236281475L320.14151065203356 32.129115558424786H349.536475145255L384.95132343447386 127.74280180761781H360.1673337637185L354.1474499677211 110.32356358941252ZM321.74254357650096 92.58411878631375H347.9354422207876L334.87101355713367 54.543576500968356L321.74254357650096 92.58411878631375ZM384.31091026468687 32.129115558424786H411.27230471271787L433.0463524854745 66.19909619109102L454.8204002582311 32.129115558424786H481.84583602324085L445.40632666236286 87.46081342801807V127.74280180761781H420.75041962556486V87.46081342801807L384.31091026468687 32.129115558424786ZM481.2054228534538 32.129115558424786H505.9894125242091L531.3497740477727 102.7026468689477L556.6460942543576 32.129115558424786H581.430083925113L546.0152356358941 127.74280180761781H516.6202711426727L481.2054228534538 32.129115558424786ZM629.1408650742414 74.52446739832149Q636.8898644286636 74.52446739832149 640.2520335700452 71.64260813428018Q643.6142027114267 68.76074887023886 643.6142027114267 62.164493221433176Q643.6142027114267 55.632278889606184 640.2520335700452 52.81446094254356Q636.8898644286636 49.996642995480954 629.1408650742414 49.996642995480954H618.7661717236927V74.52446739832149H629.1408650742414ZM618.7661717236927 91.5594577146546V127.74280180761781H594.1102646868948V32.129115558424786H631.766559070368Q650.6587475790833 32.129115558424786 659.464428663654 38.469205939315685Q668.2701097482246 44.80929632020657 668.2701097482246 58.51413815364751Q668.2701097482246 67.9922530664945 663.6911555842479 74.07617817947062Q659.1122014202712 80.16010329244673 649.8902517753389 83.04196255648804Q654.9495158166559 84.19470626210457 658.9520981278245 88.26132989025177Q662.9546804389929 92.32795351839896 667.0533247256294 100.58928340865073L680.4379599741769 127.74280180761781H654.1810200129115L642.5255003227888 103.98347320852162Q639.0032278889606 96.81084570690767 635.3848934796642 94.18515171078114Q631.766559070368 91.5594577146546 625.7466752743705 91.5594577146546H618.7661717236927ZM738.7795997417688 48.26752743705616Q727.5083279535183 48.26752743705616 721.2963202065848 56.592898644286635Q715.0843124596513 64.9182698515171 715.0843124596513 80.03202065848933Q715.0843124596513 95.08173014848288 721.2963202065848 103.40710135571335Q727.5083279535183 111.73247256294383 738.7795997417688 111.73247256294383Q750.114912846998 111.73247256294383 756.3269205939315 103.40710135571335Q762.538928340865 95.08173014848288 762.538928340865 80.03202065848933Q762.538928340865 64.9182698515171 756.3269205939315 56.592898644286635Q750.114912846998 48.26752743705616 738.7795997417688 48.26752743705616ZM738.7795997417688 30.39999999999999Q761.8344738540994 30.39999999999999 774.8989025177534 43.59251129761135Q787.9633311814073 56.78502259522271 787.9633311814073 80.03202065848933Q787.9633311814073 103.21497740477727 774.8989025177534 116.40748870238863Q761.8344738540994 129.6 738.7795997417688 129.6Q715.788766946417 129.6 702.6923176242736 116.40748870238863Q689.5958683021304 103.21497740477727 689.5958683021304 80.03202065848933Q689.5958683021304 56.78502259522271 702.6923176242736 43.59251129761135Q715.788766946417 30.39999999999999 738.7795997417688 30.39999999999999Z"/></svg>';
+var LOGO_OSCURO_HTML='<svg role="img" aria-label="PAYVRO" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 787.963 160"><path fill="#F5F3EC" d="M76.42857142857143 0.0H55.71428571428571Q52.85714285714286 0.0 52.85714285714286 2.8571428571428577V15.714285714285714H40.0Q37.14285714285714 15.714285714285714 37.14285714285714 18.57142857142857V30.0H27.14285714285714Q24.285714285714285 30.0 24.285714285714285 32.857142857142854V44.285714285714285H18.57142857142857C7.142857142857144 44.285714285714285 0.0 54.28571428571429 0.0 65.71428571428571V76.42857142857143L52.85714285714286 72.14285714285714C62.14285714285714 71.42857142857143 67.85714285714286 67.85714285714286 70.0 60.71428571428571L76.42857142857143 0.0Z"/><path fill="#F5F3EC" d="M160.00000000000003 76.42857142857143V55.71428571428571Q160.00000000000003 52.85714285714286 157.14285714285717 52.85714285714286H144.2857142857143V40.0Q144.2857142857143 37.14285714285714 141.42857142857144 37.14285714285714H130.00000000000003V27.14285714285714Q130.00000000000003 24.285714285714285 127.14285714285715 24.285714285714285H115.71428571428571V18.57142857142857C115.71428571428571 7.142857142857144 105.71428571428571 0.0 94.28571428571429 0.0H83.57142857142857L87.85714285714286 52.85714285714286C88.57142857142857 62.14285714285714 92.14285714285714 67.85714285714286 99.28571428571429 70.0L160.00000000000003 76.42857142857143Z"/><path fill="#F5F3EC" d="M83.57142857142857 160.00000000000003H104.28571428571429Q107.14285714285714 160.00000000000003 107.14285714285714 157.14285714285717V144.2857142857143H120.00000000000001Q122.85714285714285 144.2857142857143 122.85714285714285 141.42857142857144V130.00000000000003H132.85714285714286Q135.71428571428572 130.00000000000003 135.71428571428572 127.14285714285715V115.71428571428571H141.42857142857144C152.85714285714286 115.71428571428571 160.00000000000003 105.71428571428571 160.00000000000003 94.28571428571429V83.57142857142857L107.14285714285714 87.85714285714286C97.85714285714286 88.57142857142857 92.14285714285714 92.14285714285714 90.0 99.28571428571429L83.57142857142857 160.00000000000003Z"/><path fill="#F5F3EC" d="M0.0 83.57142857142857V104.28571428571429Q0.0 107.14285714285714 2.8571428571428577 107.14285714285714H15.714285714285714V120.00000000000001Q15.714285714285714 122.85714285714285 18.57142857142857 122.85714285714285H30.0V132.85714285714286Q30.0 135.71428571428572 32.857142857142854 135.71428571428572H44.285714285714285V141.42857142857144C44.285714285714285 152.85714285714286 54.28571428571429 160.00000000000003 65.71428571428571 160.00000000000003H76.42857142857143L72.14285714285714 107.14285714285714C71.42857142857143 97.85714285714286 67.85714285714286 92.14285714285714 60.71428571428571 90.0L0.0 83.57142857142857Z"/><path fill="#F5F3EC" d="M200.0 32.129115558424786H240.9224015493867Q259.17417688831506 32.129115558424786 268.9404777275662 40.230342156229824Q278.7067785668173 48.33156875403485 278.7067785668173 63.317236927049706Q278.7067785668173 78.36694641704324 268.9404777275662 86.46817301484828Q259.17417688831506 94.56939961265331 240.9224015493867 94.56939961265331H224.65590703679794V127.74280180761781H200.0V32.129115558424786ZM224.65590703679794 49.996642995480954V76.70187217559715H238.29670755326018Q245.4693350548741 76.70187217559715 249.37585539057457 73.21162040025823Q253.282375726275 69.7213686249193 253.282375726275 63.317236927049706Q253.282375726275 56.913105229180104 249.37585539057457 53.45487411233053Q245.4693350548741 49.996642995480954 238.29670755326018 49.996642995480954H224.65590703679794ZM354.1474499677211 110.32356358941252H315.59457714654616L309.51065203357007 127.74280180761781H284.72666236281475L320.14151065203356 32.129115558424786H349.536475145255L384.95132343447386 127.74280180761781H360.1673337637185L354.1474499677211 110.32356358941252ZM321.74254357650096 92.58411878631375H347.9354422207876L334.87101355713367 54.543576500968356L321.74254357650096 92.58411878631375ZM384.31091026468687 32.129115558424786H411.27230471271787L433.0463524854745 66.19909619109102L454.8204002582311 32.129115558424786H481.84583602324085L445.40632666236286 87.46081342801807V127.74280180761781H420.75041962556486V87.46081342801807L384.31091026468687 32.129115558424786ZM481.2054228534538 32.129115558424786H505.9894125242091L531.3497740477727 102.7026468689477L556.6460942543576 32.129115558424786H581.430083925113L546.0152356358941 127.74280180761781H516.6202711426727L481.2054228534538 32.129115558424786ZM629.1408650742414 74.52446739832149Q636.8898644286636 74.52446739832149 640.2520335700452 71.64260813428018Q643.6142027114267 68.76074887023886 643.6142027114267 62.164493221433176Q643.6142027114267 55.632278889606184 640.2520335700452 52.81446094254356Q636.8898644286636 49.996642995480954 629.1408650742414 49.996642995480954H618.7661717236927V74.52446739832149H629.1408650742414ZM618.7661717236927 91.5594577146546V127.74280180761781H594.1102646868948V32.129115558424786H631.766559070368Q650.6587475790833 32.129115558424786 659.464428663654 38.469205939315685Q668.2701097482246 44.80929632020657 668.2701097482246 58.51413815364751Q668.2701097482246 67.9922530664945 663.6911555842479 74.07617817947062Q659.1122014202712 80.16010329244673 649.8902517753389 83.04196255648804Q654.9495158166559 84.19470626210457 658.9520981278245 88.26132989025177Q662.9546804389929 92.32795351839896 667.0533247256294 100.58928340865073L680.4379599741769 127.74280180761781H654.1810200129115L642.5255003227888 103.98347320852162Q639.0032278889606 96.81084570690767 635.3848934796642 94.18515171078114Q631.766559070368 91.5594577146546 625.7466752743705 91.5594577146546H618.7661717236927ZM738.7795997417688 48.26752743705616Q727.5083279535183 48.26752743705616 721.2963202065848 56.592898644286635Q715.0843124596513 64.9182698515171 715.0843124596513 80.03202065848933Q715.0843124596513 95.08173014848288 721.2963202065848 103.40710135571335Q727.5083279535183 111.73247256294383 738.7795997417688 111.73247256294383Q750.114912846998 111.73247256294383 756.3269205939315 103.40710135571335Q762.538928340865 95.08173014848288 762.538928340865 80.03202065848933Q762.538928340865 64.9182698515171 756.3269205939315 56.592898644286635Q750.114912846998 48.26752743705616 738.7795997417688 48.26752743705616ZM738.7795997417688 30.39999999999999Q761.8344738540994 30.39999999999999 774.8989025177534 43.59251129761135Q787.9633311814073 56.78502259522271 787.9633311814073 80.03202065848933Q787.9633311814073 103.21497740477727 774.8989025177534 116.40748870238863Q761.8344738540994 129.6 738.7795997417688 129.6Q715.788766946417 129.6 702.6923176242736 116.40748870238863Q689.5958683021304 103.21497740477727 689.5958683021304 80.03202065848933Q689.5958683021304 56.78502259522271 702.6923176242736 43.59251129761135Q715.788766946417 30.39999999999999 738.7795997417688 30.39999999999999Z"/></svg>';
+var ISO='<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 448"><path fill="#00B8B2" d="M214.0 0.0H156.0Q148.0 0.0 148.0 8.0V44.0H112.0Q104.0 44.0 104.0 52.0V84.0H76.0Q68.0 84.0 68.0 92.0V124.0H52.0C20.0 124.0 0.0 152.0 0.0 184.0V214.0L148.0 202.0C174.0 200.0 190.0 190.0 196.0 170.0L214.0 0.0Z"/><path fill="#EF006D" d="M448.0 214.0V156.0Q448.0 148.0 440.0 148.0H404.0V112.0Q404.0 104.0 396.0 104.0H364.0V76.0Q364.0 68.0 356.0 68.0H324.0V52.0C324.0 20.0 296.0 0.0 264.0 0.0H234.0L246.0 148.0C248.0 174.0 258.0 190.0 278.0 196.0L448.0 214.0Z"/><path fill="#FFC400" d="M234.0 448.0H292.0Q300.0 448.0 300.0 440.0V404.0H336.0Q344.0 404.0 344.0 396.0V364.0H372.0Q380.0 364.0 380.0 356.0V324.0H396.0C428.0 324.0 448.0 296.0 448.0 264.0V234.0L300.0 246.0C274.0 248.0 258.0 258.0 252.0 278.0L234.0 448.0Z"/><path fill="#FF7900" d="M0.0 234.0V292.0Q0.0 300.0 8.0 300.0H44.0V336.0Q44.0 344.0 52.0 344.0H84.0V372.0Q84.0 380.0 92.0 380.0H124.0V396.0C124.0 428.0 152.0 448.0 184.0 448.0H214.0L202.0 300.0C200.0 274.0 190.0 258.0 170.0 252.0L0.0 234.0Z"/></svg>';
+
+/* ---------- utilidades ---------- */
+function h(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function money(n){return '$'+Number(n).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2});}
+var IC={
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  check:'<path d="M5 12.5l4.5 4.5L19 7"/>',
+  checks:'<path d="M2 12.5l4 4L15 7"/><path d="M11 16l.7.6L22 7"/>',
+  alert:'<path d="M12 3.5L22 20H2z"/><path d="M12 10v4.5"/><path d="M12 17.3v.2"/>',
+  off:'<circle cx="12" cy="12" r="9"/><path d="M6 6l12 12"/>',
+  xc:'<circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/>',
+  pause:'<circle cx="12" cy="12" r="9"/><path d="M10 9v6M14 9v6"/>',
+  copy:'<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
+  msg:'<path d="M4 5h16v11H9l-5 4z"/>',
+  qr:'<rect x="4" y="4" width="6" height="6"/><rect x="14" y="4" width="6" height="6"/><rect x="4" y="14" width="6" height="6"/><path d="M14 14h2v2h-2zM18 18h2v2h-2zM18 14h2M14 18v2"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  lock:'<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+  list:'<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/>',
+  grid:'<rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/>',
+  shop:'<path d="M4 9l1.5-5h13L20 9"/><path d="M4 9v11h16V9"/><path d="M9 20v-6h6v6"/>',
+  card:'<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/>',
+  gear:'<circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/>',
+  phone:'<rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/>',
+  sound:'<path d="M4 10v4h4l5 4V6L8 10z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/>',
+  back:'<path d="M15 5l-7 7 7 7"/>',
+  key:'<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3"/>',
+  user:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+  refresh:'<path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/>',
+  wifi:'<path d="M3 9a14 14 0 0 1 18 0M6.5 12.5a9 9 0 0 1 11 0M10 16a4 4 0 0 1 4 0"/><path d="M4 4l16 16"/>',
+  server:'<rect x="4" y="4" width="16" height="7" rx="2"/><rect x="4" y="13" width="16" height="7" rx="2"/><path d="M8 7.5h.01M8 16.5h.01"/>'
+};
+function ic(n){return '<svg class="i" viewBox="0 0 24 24" aria-hidden="true">'+IC[n]+'</svg>';}
+var ST={
+  esperando:{t:'Esperando pago',c:'wait',i:'clock'},
+  verificado:{t:'Pago verificado',c:'ok',i:'check'},
+  liberado:{t:'Liberado',c:'lib',i:'checks'},
+  revision:{t:'En revisión',c:'rev',i:'alert'},
+  expirado:{t:'Expirado',c:'exp',i:'off'},
+  cerrado:{t:'Cerrado sin liberar',c:'exp',i:'xc'}
+};
+function badge(s,extra){var d=ST[s];return '<span class="badge b-'+d.c+'">'+ic(d.i)+d.t+(extra?' · '+extra:'')+'</span>';}
+function mb(c,i,t){return '<span class="badge b-'+c+'">'+ic(i)+t+'</span>';}
+var PV='<span class="tag pv">Por validar</span>';
+function sk(w,hh){return '<span class="sk" style="width:'+w+';height:'+hh+'px" aria-hidden="true"></span>';}
+function qr(seed){
+  var n=21,out='',s=seed||7;
+  function rnd(){s=(s*1103515245+12345)&0x7fffffff;return s/0x7fffffff;}
+  function fin(r,c){var cs=[[0,0],[0,n-7],[n-7,0]];for(var k=0;k<3;k++){var rr=r-cs[k][0],cc=c-cs[k][1];
+    if(rr>=0&&rr<7&&cc>=0&&cc<7){return (rr===0||rr===6||cc===0||cc===6||(rr>=2&&rr<=4&&cc>=2&&cc<=4))?1:0;}
+    if(rr>=-1&&rr<=7&&cc>=-1&&cc<=7)return 0;}return -1;}
+  for(var r=0;r<n;r++)for(var c=0;c<n;c++){var f=fin(r,c),d=f>=0?f:(rnd()>.52?1:0);if(d)out+='<rect x="'+c+'" y="'+r+'" width="1" height="1"/>';}
+  return '<svg viewBox="0 0 '+n+' '+n+'" role="img" aria-label="QR de ejemplo. No es un código real." fill="#142B3B" shape-rendering="crispEdges">'+out+'</svg>';
+}
+
+/* ---------- estado ---------- */
+var S={
+  route:'indice',sub:{},device:'desktop',plan:'gratis',demo:true,first:false,os:false,osWa:false,osModel:false,revClosed:false,
+  biz:{name:'Dulces Ana — Ejemplo',color:'#076B76',giro:'Vendo por WhatsApp/Instagram'},
+  tpl:'pedido',tplFree:'pedido',ruleTpl:'cita',pendTpl:null,filter:'todos',sel:'#131',pad:'8500',dialog:null,toast:null,connect:null,revDone:null,
+  charges:[
+    {id:'#131',k:'cita',tpl:'Anticipo de cita',con:'Corte y color · sáb 21 nov, 11:00',amt:300,st:'esperando',at:'11:20',tel:'55 •••• 4821'},
+    {id:'#130',k:'cotizacion',tpl:'Cotización',con:'Mesa de dulces · anticipo 50 %',amt:700,st:'verificado',at:'10:58',tel:'55 •••• 1077'},
+    {id:'#129',k:'pedido',tpl:'Pedido',con:'3 pasteles de tres leches',amt:890,st:'revision',at:'10:31',tel:'',why:'monto',got:800},
+    {id:'#128',k:'pedido',tpl:'Pedido',con:'2 cajas de alfajores',amt:450,st:'liberado',at:'09:47',tel:'55 •••• 3390'},
+    {id:'#127',k:'pedido',tpl:'Pedido',con:'1 caja surtida',amt:260,st:'expirado',at:'Ayer 09:05',tel:''},
+    {id:'#126',k:'pedido',tpl:'Pedido',con:'Charola de galletas',amt:320,st:'cerrado',at:'Ayer 17:40',tel:'',got:300,reason:'Monto distinto: recibido $300.00 de $320.00',by:'Ana López (dueña)',ref:true}
+  ]
+};
+function ch(id){for(var i=0;i<S.charges.length;i++)if(S.charges[i].id===id)return S.charges[i];return S.charges[0];}
+function sub(){return S.sub[S.route]||R[S.route].states[0][0];}
+function link(c){return 'payvro.example/c/'+c.id.replace('#','');}
+var PLAN_N={gratis:'Gratis',pro:'Pro',business:'Business'};
+var VIG={pedido:'24 horas',cita:'hasta 2 h antes de la cita',cotizacion:'7 días',membresia:'link de pago de 7 días',mostrador:'15 minutos'};
+function vence(c){return {pedido:'Vence en 23 h 12 min',cita:'Vence el sáb 21 nov a las 9:00, 2 h antes de la cita',cotizacion:'Vence en 6 días'}[c.k]||'Vence en 23 h 12 min';}
+function relWord(c){return {pedido:'Pedido '+c.id+' liberado',cita:'Cita confirmada',cotizacion:'Trabajo en marcha',membresia:'Membresía al corriente'}[c.k]||'Liberado';}
+
+/* ---------- plantillas y planes ---------- */
+var TPLS=[
+  ['pedido','Pedido que se libera','El pedido se suelta solo cuando el pago está verificado.','base'],
+  ['cita','Anticipo de cita','La cita se confirma al verificar el anticipo.','base'],
+  ['cotizacion','Cotización que arranca','El trabajo empieza cuando se paga la cotización.','base'],
+  ['mostrador','Mostrador','QR de precio fijo en caja y aviso hablado «Recibiste $X».','base'],
+  ['membresia','Membresía','Link de pago cada mes, con recordatorios. Se pausa si no pagan y se reactiva sola al pagar.','base'],
+  ['checkout','Checkout en línea','Para tiendas, por API o MCP.','business']
+];
+function tplBy(id){return TPLS.filter(function(x){return x[0]===id;})[0];}
+/* '' = disponible · 'swap' = Gratis usa otra plantilla · 'pro' / 'business' = requiere ese plan */
+function lockOf(t){
+  if(t[3]==='business')return S.plan==='business'?'':'business';
+  if(t[3]==='pro')return S.plan==='gratis'?'pro':'';
+  return (S.plan==='gratis'&&S.tplFree!==t[0])?'swap':'';
+}
+function lockTag(l){return l==='swap'?'<span class="tag out">'+ic('lock')+'Otra plantilla</span>':(l==='pro'?'<span class="tag pro">'+ic('lock')+'Pro</span>':(l==='business'?'<span class="tag">'+ic('lock')+'Business</span>':''));}
+var PLANS=[
+  ['gratis','Gratis',['Links y QR sin límite','Verificación automática','1 usuario','1 plantilla, la que elijas: cualquiera, también Mostrador']],
+  ['pro','Pro',['WhatsApp desde la misma interfaz','Todas las plantillas a la vez','Agente','Varios usuarios: Dueño, Administrador y Cajero','Tu propia marca']],
+  ['business','Business',['Sucursales y roles por sucursal','Permisos finos','API, MCP y webhooks','Integraciones']],
+  ['enterprise','Enterprise',['Operado por GNOSIX en la nube, con pey','SSO y auditoría','SLA']]
+];
+var COLORS=[['#076B76','Petróleo'],['#142B3B','Tinta'],['#9A2A5B','Vino'],['#8A4B00','Canela'],['#3B4FA0','Azul']];
+var GIROS=[['Vendo por WhatsApp/Instagram','pedido'],['Servicios con cita','cita'],['Cotizaciones','cotizacion'],['Mostrador','mostrador'],['Membresías','membresia'],['Tienda en línea','checkout']];
+
+/* ---------- piezas compartidas ---------- */
+function demoBar(){return S.demo?'<div class="demo-bar" role="status"><span class="tag demo">DEMO</span> Modo DEMO: '+(S.os?'aún no conectas tu cuenta pey.':'tu CLABE aún no está validada.')+' Estos cobros son de práctica y no se mueve dinero real.</div>':'';}
+var NAV=[['panel','Cobros','list'],['plantillas','Plantillas','grid'],['mostrador','Mostrador','shop'],['plan','Plan','card'],['ajustes','Ajustes','gear']];
+function shell(active,inner){
+  var side='',tabs='';
+  var nav=S.os?NAV.filter(function(n){return n[0]!=='plan';}):NAV;
+  nav.forEach(function(n){var cur=n[0]===active?' aria-current="page"':'';
+    side+='<button type="button" id="sd-'+n[0]+'" data-go="'+n[0]+'"'+cur+'>'+ic(n[2])+n[1]+'</button>';
+    tabs+='<button type="button" id="tb-'+n[0]+'" data-go="'+n[0]+'"'+cur+'>'+ic(n[2])+n[1]+'</button>';});
+  return demoBar()+'<div class="app"><nav class="side dark" aria-label="Secciones"><span class="logo">'+LOGO_OSCURO_HTML+'</span>'+side+
+    '<div class="foot">'+(S.os?'PAYVRO OS<br>Instalación propia':'Plan '+PLAN_N[S.plan]+'<br>'+(S.plan==='gratis'?'1 usuario':'3 usuarios'))+'</div></nav>'+
+    '<div class="main"><div class="bar"><div class="biz"><span class="av" style="background:'+h(S.biz.color)+'" aria-hidden="true">'+h(S.biz.name.charAt(0)||'N')+'</span>'+h(S.biz.name)+'</div><span class="sp"></span>'+
+    '<button type="button" class="btn sm" id="bar-new" data-go="nuevo-cobro" data-st="formulario">'+ic('plus')+'Nuevo cobro</button></div>'+
+    inner+'<nav class="tabbar" style="grid-template-columns:repeat('+nav.length+',1fr)" aria-label="Secciones">'+tabs+'</nav></div></div>';
+}
+function steps(n){var l=['Cuenta','Giro','Tu negocio'],o='<div class="steps" aria-label="Paso '+Math.min(n,3)+' de 3">';
+  l.forEach(function(t,i){var c=i+1<n?'ok':(i+1===n?'on':'');o+='<span class="'+c+'"><i>'+(i+1<n?'✓':(i+1))+'</i>'+t+'</span>'+(i<2?'<span aria-hidden="true">—</span>':'');});
+  return o+'</div>';}
+function onbTop(extra){return '<div class="ld-nav"><span class="logo">'+LOGO_CLARO+'</span><span class="sp"></span>'+(extra||'<span class="small mut">Menos de 2 minutos</span>')+'</div>';}
+function swatches(pre){return '<div class="sw" role="group" aria-labelledby="'+pre+'-l">'+COLORS.map(function(c,i){return '<button type="button" id="'+pre+'-'+i+'" style="background:'+c[0]+'" aria-label="'+c[1]+'" aria-pressed="'+(S.biz.color===c[0])+'" data-act="color" data-v="'+c[0]+'"></button>';}).join('')+'</div>';}
+function retry(st,label){return '<button type="button" class="btn sec sm" data-st="'+st+'">'+ic('refresh')+(label||'Reintentar')+'</button>';}
+
+/* ---------- 0 indice ---------- */
+function vIndice(){
+  var o='<div class="ld-sec" style="padding-top:32px"><div class="logo" style="height:40px;margin-bottom:20px">'+LOGO_CLARO+'</div>'+
+  '<h1 style="font-size:34px;margin-bottom:8px">Pantallas y lógica de UX de PAYVRO</h1>'+
+  '<p style="font-size:17px;color:var(--mut);max-width:720px;margin-bottom:8px">Trece pantallas, cada una con todos sus estados: los normales, los vacíos, los de carga y los de error. Arriba cambias la edición (Cloud u OS), la vista, el plan y si la cuenta está en DEMO o validada. Los datos son de ejemplo y lo marcado «Por validar» es una decisión provisional.</p>'+
+  '<p style="margin-bottom:24px" class="row"><button type="button" class="btn" data-act="tour">Recorrer el flujo principal</button><button type="button" class="btn sec" data-go="landing">Empezar por la landing</button></p>'+
+  '<div class="grid g3">';
+  ORDER.forEach(function(k,i){var r=R[k];if(k==='indice')return;
+    o+='<div class="card col" style="gap:8px"><div class="row" style="gap:8px"><span class="kn k'+((i-1)%4+1)+'">'+i+'</span><h2 style="font-size:18px">'+r.t+'</h2></div><p class="small mut">'+r.who+' · '+r.states.length+(r.states.length===1?' estado':' estados')+'</p><div class="chips">';
+    r.states.forEach(function(s){o+='<button type="button" class="chip" style="min-height:32px;padding:3px 10px;font-weight:400" data-go="'+k+'" data-st="'+s[0]+'">'+s[1]+'</button>';});
+    o+='</div></div>';});
+  return o+'</div></div>';
+}
+
+/* ---------- 1 landing ---------- */
+function planCards(inApp){
+  var o='<div class="grid g4">';
+  PLANS.forEach(function(p){var cur=inApp&&S.plan===p[0];
+    o+='<div class="card plan'+(cur?' cur':'')+'"><div class="row"><h3 style="font-size:22px">'+p[1]+'</h3>'+(cur?'<span class="tag pro">Tu plan</span>':'')+'</div>'+
+    '<p class="small mut">'+(p[0]==='gratis'?'Sin costo':'Cuota fija mensual · precio por definir')+'</p><ul>';
+    p[2].forEach(function(f){o+='<li>'+ic('check')+'<span>'+f+'</span></li>';});
+    o+='</ul><span class="sp"></span>';
+    if(inApp){o+=cur?'<span class="small mut">Plan actual</span>':(p[0]==='enterprise'?'<button type="button" class="btn sec sm" id="pc-ent" data-act="toast" data-msg="Prototipo: abre el formulario de contacto con GNOSIX.">Hablar con GNOSIX</button>':'<button type="button" class="btn sm" id="pc-'+p[0]+'" data-act="setplan" data-p="'+p[0]+'">Cambiar a '+p[1]+'</button>');}
+    else{o+=p[0]==='gratis'?'<button type="button" class="btn sm" data-go="acceso" data-st="registro">Crea tu cuenta gratis</button>':'';}
+    o+='</div>';});
+  return o+'</div>';
+}
+function vLanding(){
+  var c=ch('#128');
+  return '<header class="ld-nav"><span class="logo">'+LOGO_CLARO+'</span><span class="sp"></span>'+
+  '<a class="l" href="#landing" data-scroll="como">Cómo funciona</a><a class="l" href="#landing" data-scroll="plantillas">Plantillas</a><a class="l" href="#landing" data-scroll="planes">Planes</a><a class="l" href="#landing" data-scroll="faq">Preguntas</a>'+
+  '<button type="button" class="btn ghost sm hide-m" data-go="acceso" data-st="ingreso">Entrar</button><button type="button" class="btn sm" data-go="acceso" data-st="registro">Crea tu cuenta gratis</button></header>'+
+
+  '<section class="ld-sec"><div class="hero"><div><h1>Cobra y libera, sin comprobantes.</h1>'+
+  '<p class="lead">La base de cobro del emprendedor y la PyME mexicana. Crea un cobro CoDi con link o QR; PAYVRO verifica el pago directo con pey y libera el pedido, confirma la cita o arranca el trabajo.</p>'+
+  '<div class="row"><button type="button" class="btn lg" data-go="acceso" data-st="registro">Crea tu cuenta gratis</button><a class="btn sec lg" href="#landing" data-scroll="como">Cómo funciona</a></div>'+
+  '<p class="small mut" style="margin-top:14px">El dinero va directo a tu CLABE. PAYVRO no toca el dinero y no cobra comisión.</p></div>'+
+  '<div class="card" style="box-shadow:var(--sh)"><div class="row"><span class="small mut num">Pedido '+c.id+'</span><span class="tag out">Ejemplo</span><span class="sp"></span>'+badge('liberado')+'</div>'+
+  '<p style="font-family:var(--hd);font-weight:700;font-size:34px;margin:8px 0 2px" class="num">'+money(c.amt)+'</p><p class="mut" style="margin-bottom:14px">'+c.con+'</p>'+
+  '<ol class="tl"><li><span class="dot">'+ic('check')+'</span><div><b>Cobro creado</b><span class="t">Link enviado al cliente</span></div></li>'+
+  '<li><span class="dot">'+ic('check')+'</span><div><b>Pago verificado con pey</b><span class="t">Monto y cuenta destino coinciden</span></div></li>'+
+  '<li><span class="dot">'+ic('checks')+'</span><div><b>Pedido liberado</b><span class="t">Sin pedir comprobante</span></div></li></ol></div></div></section>'+
+
+  '<section class="band"><div class="ld-sec"><div class="eyebrow" style="color:#7FD6D3">El problema</div><h2>Hoy cobrar por transferencia es perseguir comprobantes.</h2>'+
+  '<div class="split" style="margin-top:24px"><div class="chat" role="img" aria-label="Chat de ejemplo: el cliente pide la CLABE, manda una captura del comprobante y el negocio tiene que revisar su banca."><div class="h"><span>Chat de ejemplo</span><span class="tag out">Ejemplo</span></div><div class="m" style="color:var(--ink)">'+
+  '<div class="bub">¿Me pasas tu CLABE?</div><div class="bub">Ya te transferí, aquí el comprobante<div class="shot">captura del comprobante</div></div><div class="bub me">Déjame revisar mi banca…</div></div></div>'+
+  '<div class="col"><div class="row" style="align-items:flex-start;flex-wrap:nowrap"><span class="kn k1">1</span><div><h3 style="font-size:19px">Tiempo en cada venta</h3><p class="mut">Pedir la cuenta, esperar, abrir la banca y comparar.</p></div></div>'+
+  '<div class="row" style="align-items:flex-start;flex-wrap:nowrap"><span class="kn k2">2</span><div><h3 style="font-size:19px">Comprobantes falsos</h3><p class="mut">Una captura de pantalla no es un pago.</p></div></div>'+
+  '<div class="row" style="align-items:flex-start;flex-wrap:nowrap"><span class="kn k3">3</span><div><h3 style="font-size:19px">El pedido se queda detenido</h3><p class="mut">Mientras no confirmas, no entregas, no agendas y no arrancas.</p></div></div></div></div></div></section>'+
+
+  '<section class="ld-sec" id="sec-como"><div class="eyebrow">Cómo funciona</div><h2>Un solo motor, cuatro pasos.</h2><div class="grid g4" style="margin-top:24px">'+
+  [['Intención','Un pedido, una cita o una cotización.'],['Cobro CoDi','Link o QR, con la API de pey.'],['Pago verificado','PAYVRO lo confirma directo con pey.'],['Liberación','Suelta el pedido, confirma la cita, arranca el trabajo.']].map(function(s,i){
+    return '<div class="card col" style="gap:8px"><span class="kn k'+(i+1)+'">'+(i+1)+'</span><h3 style="font-size:20px">'+s[0]+'</h3><p class="mut">'+s[1]+'</p></div>';}).join('')+
+  '</div><p style="margin-top:20px;font-family:var(--hd);font-size:19px;border-top:1px solid var(--line);padding-top:16px">Nada aparece como pagado hasta que pey lo confirma.</p></section>'+
+
+  '<section class="ld-sec" id="sec-plantillas" style="padding-top:8px"><div class="eyebrow">Plantillas por giro</div><h2>Cada negocio cobra a su manera. El motor es el mismo.</h2><div class="grid g3" style="margin-top:24px">'+
+  TPLS.map(function(t,i){return '<div class="card col" style="gap:6px"><div class="row"><h3 style="font-size:19px">'+t[1]+'</h3>'+(i===0?'<span class="tag pro">Primera</span>':'')+'</div><p class="mut">'+t[2]+'</p></div>';}).join('')+
+  '</div><p class="mut" style="margin-top:16px">Empezamos con quien vende por WhatsApp o Instagram y con servicios que cobran anticipo.</p></section>'+
+
+  '<section class="ld-sec" id="sec-planes" style="padding-top:8px"><div class="eyebrow">Planes</div><h2>Cuota fija por plan, sin sorpresas.</h2><p class="lead">Desde el plan Gratis ya cobras y liberas. Nunca cobramos por pago ni comisión sobre CoDi.</p>'+planCards(false)+'</section>'+
+
+  '<section class="ld-sec" style="padding-top:8px"><div class="card" style="display:grid;gap:8px;border-left:4px solid var(--pet)"><div class="eyebrow" style="margin:0">Con la API de pey</div>'+
+  '<h3 style="font-size:22px">Los cobros CoDi se crean y se consultan con la API de pey.</h3>'+
+  '<p class="mut" style="max-width:760px">PAYVRO usa la API de pey para generar el QR, enviar la solicitud de cobro al celular, crear el link de pago y consultar si el pago llegó. Tú conectas tu propia cuenta pey; el dinero va de tu cliente a tu CLABE. PAYVRO es un producto independiente de GNOSIX.</p></div></section>'+
+
+  '<section class="ld-sec" id="sec-faq" style="padding-top:8px"><div class="eyebrow">Preguntas</div><h2>Lo que nos preguntan primero.</h2><div style="margin-top:12px">'+
+  [['¿PAYVRO recibe o guarda mi dinero?','No. El pago va de la cuenta de tu cliente a tu CLABE. PAYVRO solo crea el cobro y consulta su estado.'],
+   ['¿Cobran comisión por cada pago?','No. PAYVRO se paga con una cuota fija mensual por plan. Las condiciones de tu cuenta pey son las que tengas con pey.'],
+   ['¿Qué necesito para empezar?','Una cuenta pey con una CLABE a tu nombre. Si ya la tienes, pegas tu llave. Si no, te ayudamos a abrirla: la validación tarda de 5 a 7 días hábiles y mientras tanto puedes cobrar en modo DEMO.'],
+   ['¿Qué necesita mi cliente?','La app de su banco con CoDi. Escanea el QR o acepta la solicitud de cobro en su celular. No necesita tarjeta ni crear cuenta.'],
+   ['¿Qué pasa si el pago no coincide o llega tarde?','El cobro pasa a «En revisión» y no se libera nada hasta que tú decidas. PAYVRO no hace devoluciones: si devuelves dinero, lo haces desde tu banco.']].map(function(f,i){
+    return '<details class="faq"'+(i===0?' open':'')+'><summary>'+f[0]+'</summary><p>'+f[1]+'</p></details>';}).join('')+'</div></section>'+
+
+  '<section class="band"><div class="ld-sec"><h2>Cobra y libera, sin comprobantes.</h2><p class="mut" style="margin:8px 0 20px;font-size:18px">De cero a tu primer cobro, en minutos.</p>'+
+  '<button type="button" class="btn lg" style="background:var(--paper);color:var(--ink);border-color:var(--paper)" data-go="acceso" data-st="registro">Crea tu cuenta gratis</button>'+
+  '<p class="small mut" style="margin-top:28px">PAYVRO es un producto de GNOSIX. PAYVRO OS es la edición de código abierto para un solo negocio.</p></div></section>';
+}
+
+/* ---------- 2 acceso ---------- */
+function vAcceso(){
+  var s=sub(),reg=/^(registro|error|codigo|codigo-error)$/.test(s),code=s==='codigo'||s==='codigo-error';
+  return onbTop()+'<div class="center"><h1 style="font-size:28px">'+(reg?'Crea tu cuenta':'Entra a tu cuenta')+'</h1>'+
+    '<p class="mut">'+(reg?'Con correo o Google. Sin tarjeta.':'Tus cobros te están esperando.')+'</p>'+
+    (s==='error'?'<div class="alert err" role="alert">'+ic('alert')+'<div><b>Ese correo ya tiene cuenta.</b> Entra con tu contraseña o recupérala. <button type="button" class="btn ghost sm" data-st="ingreso">Ir a entrar</button></div></div>':'')+
+    (s==='ingreso-error'?'<div class="alert err" role="alert">'+ic('alert')+'<div><b>El correo o la contraseña no coinciden.</b> Revisa que no tengas mayúsculas activadas o cambia tu contraseña.</div></div>':'')+
+    '<label class="fld" for="ac-mail">Correo<input class="inp" id="ac-mail" type="email" autocomplete="email" value="ana@ejemplo.mx"'+(s==='error'?' aria-invalid="true"':'')+(code?' readonly':'')+'></label>'+
+    '<label class="fld" for="ac-pass">Contraseña<input class="inp" id="ac-pass" type="password" autocomplete="'+(reg?'new-password':'current-password')+'" value="ejemplo123"'+(s==='ingreso-error'?' aria-invalid="true"':'')+(code?' readonly':'')+'>'+(reg&&!code?'<span class="hint">Mínimo 8 caracteres.</span>':'')+'</label>'+
+    (code?'<label class="fld" for="ac-code">Código de un solo uso <span class="hint">Lo enviamos a ana@ejemplo.mx. Tiene 6 dígitos.</span><input class="inp big num" id="ac-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" value="'+(s==='codigo-error'?'123456':'')+'" placeholder="000000"'+(s==='codigo-error'?' aria-invalid="true" aria-describedby="ac-code-e"':'')+'>'+
+      (s==='codigo-error'?'<span class="err" id="ac-code-e">'+ic('alert')+'Ese código no es correcto o ya venció. Escríbelo otra vez o pide uno nuevo.</span>':'')+'</label>'+
+      '<button type="button" class="btn block" id="ac-go" data-act="start-onb">Continuar</button>'+
+      '<p class="small mut"><button type="button" class="btn ghost sm" id="ac-re" data-act="toast" data-msg="Te enviamos un código nuevo.">Reenviar código</button> <button type="button" class="btn ghost sm" data-st="registro">Cambiar correo</button></p>'
+    :'<button type="button" class="btn block" id="ac-go" '+(reg?'data-st="codigo"':'data-go="panel" data-st="hoy"')+'>'+(reg?'Continuar':'Entrar')+'</button>'+
+      '<button type="button" class="btn sec block" id="ac-g" '+(reg?'data-act="start-onb"':'data-go="panel" data-st="hoy"')+'>Continuar con Google</button>'+
+      '<p class="small mut">'+(reg?'¿Ya tienes cuenta? <button type="button" class="btn ghost sm" data-st="ingreso">Entrar</button>':'¿Eres nuevo? <button type="button" class="btn ghost sm" data-st="registro">Crea tu cuenta gratis</button> <button type="button" class="btn ghost sm" id="ac-fg" data-act="toast" data-msg="Te enviamos un enlace para cambiar tu contraseña.">Olvidé mi contraseña</button>')+'</p>')+
+    (reg?'<p class="small mut">Al crear tu cuenta aceptas los términos y el aviso de privacidad.</p>':'')+'</div>';
+}
+
+/* ---------- 3 onboarding ---------- */
+function vOnb(){
+  var s=sub(),o=onbTop()+'<div class="center" style="max-width:600px">';
+  if(s==='giro'){
+    o+=steps(2)+'<h1 style="font-size:28px">Elige tu giro</h1><p class="mut">Así preparamos tus plantillas. Lo puedes cambiar después.</p><div class="col" style="gap:8px" role="radiogroup" aria-label="Giro del negocio">';
+    GIROS.forEach(function(g,i){var t=tplBy(g[1]);o+='<button type="button" class="opt" role="radio" id="giro-'+i+'" aria-checked="'+(S.biz.giro===g[0])+'" data-act="giro" data-v="'+g[0]+'" data-t="'+g[1]+'"><div><b>'+g[0]+'</b><span>Plantilla: '+t[1]+(t[3]==='pro'?' · plan Pro':(t[3]==='business'?' · plan Business':''))+'</span></div></button>';});
+    o+='</div><button type="button" class="btn block" id="ob-next" data-st="perfil">Continuar</button>';
+  }else if(s==='perfil'){
+    var cx=S.connect==='key'?mb('ok','check','Conectada con pey'):(S.connect==='alta'?mb('wait','clock','En validación · 5–7 días hábiles'):'<span class="badge b-exp">'+ic('clock')+'Sin conectar · empiezas en DEMO</span>');
+    o+=steps(3)+'<h1 style="font-size:28px">Tu negocio</h1><p class="mut">Así te verá tu cliente en la página de pago.</p>'+
+    '<label class="fld" for="ob-name">Nombre<input class="inp" id="ob-name" maxlength="40" value="'+h(S.biz.name)+'" data-bind="name"></label>'+
+    '<div class="fld"><span id="ob-logo-l">Logo <span class="hint">(opcional)</span></span><div class="row"><span class="av" style="width:56px;height:56px;font-size:24px;background:'+h(S.biz.color)+'" aria-hidden="true">'+h(S.biz.name.charAt(0)||'N')+'</span><button type="button" class="btn sec sm" id="ob-logo" data-act="toast" data-msg="Prototipo: aquí se abre el selector de archivo (PNG o SVG, máx. 1 MB).">Subir logo</button><span class="hint">Si no subes uno, usamos tu inicial.</span></div></div>'+
+    '<div class="fld"><span id="col-l">Color</span>'+swatches('col')+'</div>'+
+    '<div class="card col" style="gap:10px"><div class="row"><b>CLABE donde recibes</b><span class="sp"></span>'+cx+'</div>'+
+    '<p class="small mut">El dinero llega directo a tu CLABE por medio de tu cuenta pey. '+(S.connect?'':'Puedes conectarla ahora o después; mientras tanto cobras en modo DEMO.')+'</p>'+
+    (S.connect?'':'<div class="row"><button type="button" class="btn sec sm" id="ob-k" data-st="pey-llave">'+ic('key')+'Ya tengo cuenta pey</button><button type="button" class="btn sec sm" id="ob-a" data-st="pey-alta">'+ic('user')+'Ayúdame a abrir mi cuenta</button></div>')+'</div>'+
+    '<div class="row"><button type="button" class="btn sec" data-st="giro">Atrás</button><button type="button" class="btn" style="flex:1" id="ob-next" data-act="finish-onb">Continuar</button></div>';
+  }else if(s==='pey-llave'||s==='pey-error'||s==='pey-verificando'){
+    var busy=s==='pey-verificando';
+    o+=steps(3)+'<h1 style="font-size:28px">Pega tus datos de pey</h1>'+
+    (s==='pey-error'?'<div class="alert err" role="alert">'+ic('alert')+'<div><b>pey no aceptó la llave.</b> Revisa que la copiaste completa, sin espacios. Si la regeneraste, usa la más reciente.</div></div>':'')+
+    '<label class="fld" for="ob-key">Llave de API de pey<input class="inp" id="ob-key" type="password" autocomplete="off" spellcheck="false" value="ejemplo-de-llave"'+(s==='pey-error'?' aria-invalid="true"':'')+(busy?' readonly':'')+'><span class="hint">La guardamos cifrada y no la volvemos a mostrar. Si la pierdes, la reemplazas por una nueva.</span></label>'+
+    '<label class="fld" for="ob-acc">ID de cuenta bancaria<input class="inp" id="ob-acc" autocomplete="off" value="cta_ejemplo_01"'+(busy?' readonly':'')+'><span class="hint">Está en tu cuenta pey, junto a tu CLABE.</span></label>'+
+    (busy?'<div class="row" role="status"><div class="spin" aria-hidden="true"></div><span>Consultando a pey…</span></div>':'<div class="row"><button type="button" class="btn sec" data-st="perfil">Atrás</button><button type="button" class="btn" style="flex:1" id="ob-ver" data-act="connect-key">Verificar conexión</button></div>');
+  }else if(s==='pey-ok'){
+    o+=steps(4)+'<span class="badge b-ok" style="align-self:flex-start">'+ic('check')+'Conexión verificada con pey</span><h1 style="font-size:28px">Listo para cobrar</h1>'+
+    '<dl class="kv card"><dt>Llave de API</dt><dd>Guardada · no se puede ver</dd><dt>Cuenta destino</dt><dd class="num">CLABE •••• 4417</dd><dt>Titular</dt><dd>'+h(S.biz.name)+'</dd></dl>'+
+    '<button type="button" class="btn block" id="ob-next" data-act="finish-onb">Crear mi primer cobro</button>';
+  }else if(s==='pey-alta'||s==='alta-error'){
+    var bad=s==='alta-error';
+    o+=steps(3)+'<div class="row"><h1 style="font-size:28px">Abre tu cuenta de cobro</h1><span class="tag pv">Por confirmar con pey</span></div><p class="mut">Estos datos se envían a pey para validar que la CLABE es tuya.</p>'+
+    '<div class="alert info">'+ic('clock')+'<div>La validación de tu CLABE tarda de 5 a 7 días hábiles; mientras tanto puedes cobrar en modo DEMO.</div></div>'+
+    '<fieldset style="border:0" class="col"><legend class="fld" style="margin-bottom:6px">Tipo de persona</legend><div class="grid g2"><button type="button" class="opt" id="al-pf" aria-pressed="true" data-act="pick"><div><b>Física</b><span>Cobras a tu nombre</span></div></button><button type="button" class="opt" id="al-pm" aria-pressed="false" data-act="pick"><div><b>Moral</b><span>Cobra tu empresa</span></div></button></div></fieldset>'+
+    '<label class="fld" for="al-nom">Nombre o razón social<input class="inp" id="al-nom" autocomplete="name" value="Ana López Ejemplo"></label>'+
+    '<div class="grid g2"><label class="fld" for="al-rfc">RFC<input class="inp" id="al-rfc" autocomplete="off" value="XAXX010101000"></label>'+
+    '<label class="fld" for="al-tel">Celular<input class="inp" id="al-tel" type="tel" autocomplete="tel" value="55 0000 0000"></label></div>'+
+    '<label class="fld" for="al-mail">Correo<input class="inp" id="al-mail" type="email" autocomplete="email" value="ana@ejemplo.mx"></label>'+
+    '<label class="fld" for="al-clabe">CLABE a tu nombre<input class="inp num" id="al-clabe" inputmode="numeric" maxlength="18" autocomplete="off" value="'+(bad?'00000000000000':'000000000000000000')+'"'+(bad?' aria-invalid="true" aria-describedby="al-clabe-e"':'')+'>'+(bad?'<span class="err" id="al-clabe-e">'+ic('alert')+'La CLABE tiene 18 dígitos y escribiste 14. Cópiala completa desde la app de tu banco.</span>':'<span class="hint">18 dígitos. Debe estar a nombre de quien cobra.</span>')+'</label>'+
+    '<div class="row"><button type="button" class="btn sec" data-st="perfil">Atrás</button><button type="button" class="btn" style="flex:1" id="al-go" data-act="connect-alta">Enviar a validación</button></div>';
+  }else{
+    o+=steps(4)+'<span class="badge b-wait" style="align-self:flex-start">'+ic('clock')+'En validación · 5–7 días hábiles</span><h1 style="font-size:28px">Recibimos tus datos</h1>'+
+    '<p class="mut">Te avisamos por correo cuando tu CLABE quede validada. No tienes que esperar para empezar.</p>'+
+    '<div class="card col"><div class="row"><span class="tag demo">DEMO</span><b>Mientras tanto, cobra en modo DEMO</b></div><p class="mut small">Creas cobros, compartes el link y ves cómo se verifica y se libera. No se mueve dinero real y todo queda marcado como DEMO.</p></div>'+
+    '<button type="button" class="btn block" id="ob-next" data-act="finish-onb">Crear mi primer cobro en DEMO</button>'+
+    '<button type="button" class="btn ghost block" data-go="panel" data-st="vacio">Ir a mi panel</button>';
+  }
+  return o+'</div>';
+}
+
+/* ---------- 4 panel ---------- */
+function vPanel(){
+  var s=sub(),list=S.charges.slice(),tot=0,wait=0,waitAmt=0,rev=0;
+  S.charges.forEach(function(c){if(c.st==='verificado'||c.st==='liberado')tot+=c.amt;if(c.st==='esperando'){wait++;waitAmt+=c.amt;}if(c.st==='revision')rev++;});
+  if(s==='cargando')return shell('panel','<div class="body" role="status"><h2>Cobros de hoy</h2><p class="mut">Cargando tus cobros…</p><div class="grid g3 kpis"><div class="card col">'+sk('60%',12)+sk('40%',26)+'</div><div class="card col">'+sk('60%',12)+sk('40%',26)+'</div><div class="card col">'+sk('60%',12)+sk('40%',26)+'</div></div><div class="card col" style="gap:16px">'+sk('100%',20)+sk('100%',20)+sk('100%',20)+sk('70%',20)+'</div></div>');
+  if(s==='vacio'){
+    return shell('panel','<div class="body"><h2>Vamos por tu primer cobro</h2>'+
+    '<div class="split"><div class="card col"><h3 style="font-size:18px">Para empezar</h3><ol class="tl" style="margin-top:4px">'+
+    '<li><span class="dot">'+ic('check')+'</span><div><b>Crea tu cuenta</b><span class="t">Hecho</span></div></li>'+
+    '<li><span class="dot">'+ic('check')+'</span><div><b>Elige tu giro y tu marca</b><span class="t">'+h(S.biz.giro)+'</span></div></li>'+
+    (S.demo?'<li class="cur"><span class="dot">'+ic('clock')+'</span><div><b>Conecta tu CLABE</b><span class="t">'+(S.connect==='alta'?'En validación · 5–7 días hábiles.':'Sin conectar. Mientras tanto cobras en DEMO.')+' <button type="button" class="btn ghost sm" data-go="ajustes" data-st="pey">Ver estado</button></span></div></li>':
+     '<li><span class="dot">'+ic('check')+'</span><div><b>Conecta tu CLABE</b><span class="t">Conexión verificada con pey</span></div></li>')+
+    '<li class="todo"><span class="dot">4</span><div><b>Crea tu primer cobro'+(S.demo?' en DEMO':'')+'</b><span class="t">Monto, concepto y listo.</span></div></li>'+
+    '<li class="todo"><span class="dot">5</span><div><b>Comparte el link con un cliente</b><span class="t">Verás cómo se verifica y se libera.</span></div></li></ol></div>'+
+    '<div class="card col" style="align-items:flex-start"><span class="iso" style="height:44px">'+ISO+'</span><h3 style="font-size:20px">Aún no hay cobros</h3><p class="mut">Aquí verás cada cobro con su estado: esperando pago, pago verificado, liberado, en revisión o expirado.</p>'+
+    '<button type="button" class="btn" data-go="nuevo-cobro" data-st="formulario">'+ic('plus')+'Crear mi primer cobro</button></div></div></div>');
+  }
+  if(S.filter!=='todos')list=list.filter(function(c){return c.st===S.filter;});
+  if(s==='sin-resultados')list=[];
+  var chips='<div class="chips" role="group" aria-label="Filtrar por estado"><button type="button" class="chip" id="f-todos" aria-pressed="'+(S.filter==='todos')+'" data-act="filter" data-v="todos">Todos · '+S.charges.length+'</button>';
+  Object.keys(ST).forEach(function(k){var n=S.charges.filter(function(c){return c.st===k;}).length;chips+='<button type="button" class="chip" id="f-'+k+'" aria-pressed="'+(S.filter===k)+'" data-act="filter" data-v="'+k+'">'+ST[k].t+' · '+n+'</button>';});
+  chips+='</div>';
+  var rows='',cards='';
+  list.forEach(function(c,i){
+    rows+='<tr class="click" data-act="open" data-id="'+c.id+'"><td class="num"><button type="button" class="btn ghost sm" style="padding:2px 6px;min-height:32px" id="row-'+i+'" data-act="open" data-id="'+c.id+'" aria-label="Abrir cobro '+c.id+'">'+c.id+'</button></td><td><b>'+c.tpl+'</b><br><span class="mut small">'+h(c.con)+'</span></td><td class="num small mut">'+c.at+'</td><td class="r num"><b>'+money(c.amt)+'</b></td><td>'+badge(c.st,c.why==='tardio'?'pago tardío':'')+'</td></tr>';
+    cards+='<button type="button" id="crd-'+i+'" data-act="open" data-id="'+c.id+'"><span class="row" style="width:100%"><span class="small mut num">'+c.id+' · '+c.at+'</span><span class="sp"></span>'+badge(c.st)+'</span><span class="row" style="width:100%"><span><b>'+c.tpl+'</b><br><span class="mut small">'+h(c.con)+'</span></span><span class="sp"></span><b class="num">'+money(c.amt)+'</b></span></button>';
+  });
+  var empty='<div class="card col" style="align-items:flex-start"><h3 style="font-size:18px">Ningún cobro coincide</h3><p class="mut">'+(s==='sin-resultados'?'No encontramos «#999» en los cobros de hoy.':'No hay cobros con este estado hoy.')+' Quita el filtro o busca por otro folio.</p><button type="button" class="btn sec sm" id="pn-clear" data-act="filter" data-v="todos" data-st="hoy">Quitar filtros</button></div>';
+  return shell('panel','<div class="body">'+
+    (s==='error'?'<div class="alert err" role="alert">'+ic('wifi')+'<div><b>No pudimos actualizar tus cobros.</b> Estás viendo los datos de las 11:02. Revisa tu conexión a internet. '+retry('hoy')+'</div></div>':'')+
+    (rev&&s!=='error'?'<div class="alert rev" role="status">'+ic('alert')+'<div><b>'+rev+' cobro necesita tu revisión.</b> Llegó un pago que no coincide con lo esperado. No se liberó nada. <button type="button" class="btn sec sm" data-go="revision" data-st="monto">Revisar ahora</button></div></div>':'')+
+    '<div class="row"><h2>Cobros de hoy</h2><span class="mut small">sáb 14 nov 2026 · datos de ejemplo</span></div>'+
+    '<div class="grid g3 kpis"><div class="card"><div class="small mut">Cobrado hoy (verificado con pey)</div><div class="v num">'+money(tot)+'</div></div>'+
+    '<div class="card"><div class="small mut">Esperando pago</div><div class="v num">'+wait+' <span class="small mut" style="font-family:var(--bd);font-weight:400">· '+money(waitAmt)+'</span></div></div>'+
+    '<div class="card"><div class="small mut">En revisión</div><div class="v num">'+rev+'</div></div></div>'+
+    '<div class="row"><label class="sr" for="pn-q">Buscar por folio o concepto</label><input class="inp" id="pn-q" style="max-width:280px;font-size:15px" type="search" placeholder="Buscar folio o concepto" value="'+(s==='sin-resultados'?'#999':'')+'"></div>'+chips+
+    (list.length?'<div class="card tw resp" style="padding:4px 8px"><table><caption class="sr">Cobros de hoy</caption><thead><tr><th scope="col">Folio</th><th scope="col">Concepto</th><th scope="col">Hora</th><th scope="col" class="r">Monto</th><th scope="col">Estado</th></tr></thead><tbody>'+rows+'</tbody></table></div><div class="clist">'+cards+'</div>':empty)+
+    '</div>');
+}
+
+/* ---------- 5 nuevo cobro ---------- */
+function vNuevo(){
+  var s=sub();if(lockOf(tplBy(S.tpl))&&S.plan==='gratis')S.tpl=S.tplFree;
+  var t=S.tpl,o='<div class="body"><div class="row"><button type="button" class="btn ghost sm" data-go="panel" data-st="hoy">'+ic('back')+'Cobros</button></div><h2>Nuevo cobro</h2>';
+  if(s==='listo'){
+    var c=ch(S.sel),wa=S.plan==='gratis';
+    return shell('panel',o+'<div class="split"><div class="card col"><div class="row"><span class="small mut">Cobro creado</span>'+(S.demo?'<span class="tag demo">DEMO</span>':'')+'<span class="sp"></span>'+badge('esperando')+'</div>'+
+      '<p style="font-family:var(--hd);font-weight:700;font-size:22px">'+c.tpl+' '+c.id+' · '+h(c.con)+' · <span class="num">'+money(c.amt)+'</span></p>'+
+      '<label class="fld" for="nc-link">Link de pago <span class="hint">Dominio por definir</span><input class="inp num" id="nc-link" readonly value="'+link(c)+'"></label>'+
+      '<button type="button" class="btn sec block" id="nc-copy" data-act="copy" data-v="'+link(c)+'">'+ic('copy')+'Copiar link</button>'+
+      '<button type="button" class="btn block" id="nc-qr" data-go="pago" data-st="esperando">'+ic('qr')+'Mostrar QR</button>'+
+      '<button type="button" class="btn sec block" id="nc-wa" data-act="whatsapp">'+ic('msg')+'Enviar por WhatsApp'+(wa?' <span class="tag pro">Pro</span>':'')+'</button>'+
+      '<p class="small mut">'+(wa?'El envío por WhatsApp está en el plan Pro. En Gratis copias el link y lo pegas tú en el chat.':'Se envía al '+(c.tel||'número que indiques')+' con el nombre de tu negocio.')+'</p>'+
+      '<div class="row"><button type="button" class="btn ghost sm" data-go="detalle" data-st="esperando">Ver detalle</button><button type="button" class="btn ghost sm" data-st="formulario">Crear otro</button></div></div>'+
+      '<div class="card col" style="align-items:center;text-align:center"><div class="qr" style="width:200px">'+qr(11)+'</div><p class="small mut">QR CoDi de ejemplo. Muéstralo en pantalla o compártelo como imagen.</p><p class="small"><b>Vigencia:</b> '+VIG[c.k]+'</p><p class="small mut">Después de vencido no se libera solo: un pago tardío entra a «En revisión».</p></div></div></div>');
+  }
+  o+='<div class="tabs" role="tablist" aria-label="Plantilla">';
+  TPLS.forEach(function(x){var lk=lockOf(x);o+='<button type="button" role="tab" id="tp-'+x[0]+'" aria-selected="'+(t===x[0])+'" data-act="tpl" data-v="'+x[0]+'">'+x[1]+(lk?' '+lockTag(lk):'')+'</button>';});
+  o+='</div>';
+  var err=s==='error',busy=s==='creando';
+  var amount='<label class="fld" for="nc-amt">'+({cita:'Anticipo',cotizacion:'Total de la cotización',membresia:'Cuota mensual'}[t]||'Monto')+' (MXN)<input class="inp big num" id="nc-amt" inputmode="decimal" autocomplete="off" value="'+(err?'':'450.00')+'" placeholder="0.00"'+(err?' aria-invalid="true" aria-describedby="nc-amt-e"':'')+(busy?' readonly':'')+'>'+(err?'<span class="err" id="nc-amt-e">'+ic('alert')+'Escribe un monto mayor a $0.00.</span>':'')+'</label>';
+  var conc='<label class="fld" for="nc-con">Concepto<input class="inp" id="nc-con" maxlength="60" value="'+({pedido:'2 cajas de alfajores',cita:'Corte y color',cotizacion:'Mesa de dulces para 50 personas',membresia:'Membresía mensual'}[t]||'')+'"'+(busy?' readonly':'')+'><span class="hint">Lo ve tu cliente al pagar.</span></label>';
+  var tel='<label class="fld" for="nc-tel">Celular del cliente <span class="hint">'+(t==='membresia'?'Para el aviso rápido por CoDi y, con Pro, el recordatorio por WhatsApp.':'(opcional) Para enviarle la solicitud de cobro a su app bancaria.')+'</span><input class="inp num" id="nc-tel" type="tel" autocomplete="off" value="'+(t==='membresia'?'55 0000 0000':'')+'" placeholder="10 dígitos"'+(busy?' readonly':'')+'></label>';
+  var extra='',rel='Al verificar el pago, el pedido se libera solo.';
+  if(t==='cita'){extra='<div class="grid g2"><label class="fld" for="nc-date">Fecha de la cita<input class="inp" id="nc-date" type="date" value="2026-11-21"></label><label class="fld" for="nc-time">Hora<input class="inp" id="nc-time" type="time" value="11:00"></label></div>';rel='Al verificar el anticipo, la cita queda confirmada. Si no se paga a tiempo, se libera el horario.';}
+  if(t==='cotizacion'){extra='<label class="fld" for="nc-pct">Anticipo para arrancar<select class="inp" id="nc-pct"><option>50 % · $225.00</option><option>30 % · $135.00</option><option>100 % · $450.00</option></select></label>';rel='Esta plantilla pide tu confirmación: con el pago verificado, tú das el arranque.';}
+  if(t==='membresia'){extra='<label class="fld" for="nc-mail">Correo del cliente<input class="inp" id="nc-mail" type="email" autocomplete="off" value="cliente@ejemplo.mx"><span class="hint">Ahí llegan el link de pago y los recordatorios.</span></label><label class="fld" for="nc-day">Día de cobro<select class="inp" id="nc-day"><option>Día 1 de cada mes</option><option>Día 15 de cada mes</option><option>Mismo día que hoy</option></select></label>';rel='Cada mes se envía un link de pago que dura 7 días. Si paga, la membresía sigue activa; si no, se pausa el día 7.';}
+  var form;
+  if(t==='mostrador')form='<div class="card col" style="align-items:flex-start"><h3 style="font-size:18px">Mostrador se usa en su propio modo</h3><p class="mut">Teclado grande para cobrar en caja y etiquetas QR de precio fijo.</p><button type="button" class="btn" data-go="mostrador" data-st="teclado">Abrir modo Mostrador</button></div>';
+  else if(t==='checkout')form='<div class="card col" style="align-items:flex-start"><h3 style="font-size:18px">Los cobros de Checkout se crean desde tu tienda</h3><p class="mut">Tu sitio o tu agente crean el cobro por API o MCP y reciben el aviso por webhook.</p><button type="button" class="btn" data-go="ajustes" data-st="api">Ver llaves y webhooks</button></div>';
+  else form=(s==='error-pey'?'<div class="alert err" role="alert">'+ic('alert')+'<div><b>No se creó el cobro: pey no respondió.</b> No se generó ningún link ni QR. Tus datos siguen aquí; inténtalo otra vez en unos segundos. '+retry('formulario')+'</div></div>':'')+
+    '<div class="split"><div class="card col">'+amount+conc+extra+tel+
+    (busy?'<button type="button" class="btn block" aria-disabled="true"><span class="spin" style="width:18px;height:18px;border-width:2px" aria-hidden="true"></span>Creando cobro con pey…</button>':'<button type="button" class="btn block" id="nc-create" data-act="create">Crear cobro'+(S.demo?' en DEMO':'')+'</button>')+'</div>'+
+    '<div class="card col"><h3 style="font-size:16px">Qué pasa después</h3><ol class="tl"><li class="todo"><span class="dot">1</span><div><b>Cobro creado</b><span class="t">Recibes link y QR.</span></div></li><li class="todo"><span class="dot">2</span><div><b>Pago verificado con pey</b><span class="t">Monto y cuenta destino deben coincidir.</span></div></li><li class="todo"><span class="dot">3</span><div><b>Liberado</b><span class="t">'+rel+'</span></div></li></ol><p class="small"><b>Vigencia:</b> '+VIG[t]+' '+PV+'</p><p class="small mut">Se cambia en las reglas de la plantilla.</p></div></div>';
+  return shell('panel',o+form+'</div>');
+}
+
+/* ---------- 6 detalle ---------- */
+function timeline(c,s){
+  var o='<ol class="tl">',done=function(t,d){return '<li><span class="dot">'+ic('check')+'</span><div><b>'+t+'</b><span class="t">'+d+'</span></div></li>';},todo=function(n,t,d){return '<li class="todo"><span class="dot">'+n+'</span><div><b>'+t+'</b><span class="t">'+d+'</span></div></li>';};
+  o+=done('Cobro creado',c.at+' · por Ana (dueña)');
+  if(s==='esperando')o+='<li class="cur"><span class="dot">'+ic('clock')+'</span><div><b>Esperando pago</b><span class="t">'+vence(c)+'</span></div></li>'+todo(3,'Pago verificado con pey','Pendiente')+todo(4,'Liberado','Pendiente');
+  if(s==='verificado')o+=done('Pago verificado con pey','11:04 · monto y cuenta destino coinciden')+'<li class="cur"><span class="dot">'+ic('clock')+'</span><div><b>Por liberar</b><span class="t">Esta plantilla pide tu confirmación antes de liberar.</span></div></li>';
+  if(s==='liberado')o+=done('Pago verificado con pey','09:52 · monto y cuenta destino coinciden')+'<li><span class="dot">'+ic('checks')+'</span><div><b>Liberado</b><span class="t">09:52 · automático · avisamos a tu cliente</span></div></li>';
+  if(s==='revision')o+='<li class="rev"><span class="dot">'+ic('alert')+'</span><div><b>Llegó un pago que no coincide</b><span class="t">10:40 · esperado '+money(c.amt)+', recibido '+money(c.got||0)+'</span></div></li><li class="rev"><span class="dot">'+ic('alert')+'</span><div><b>En revisión</b><span class="t">No se liberó. Falta tu decisión.</span></div></li>';
+  if(s==='cerrado')o+=(c.got?'<li class="rev"><span class="dot">'+ic('alert')+'</span><div><b>Llegó un pago que no coincide</b><span class="t">Ayer 17:52 · esperado '+money(c.amt)+', recibido '+money(c.got)+'</span></div></li>':'')+'<li class="exp"><span class="dot">'+ic('xc')+'</span><div><b>Cerrado sin liberar</b><span class="t">'+(c.closedAt||'Ayer 18:10')+' · lo decidió '+c.by+(c.ref?' · devolución hecha por fuera, anotada':'')+'</span></div></li>';
+  if(s==='expirado')o+='<li class="exp"><span class="dot">'+ic('off')+'</span><div><b>Expirado sin pago</b><span class="t">Hoy 09:05 · terminó la vigencia de '+VIG[c.k]+'</span></div></li>';
+  return o+'</ol>';
+}
+function logRows(c,s){
+  var L=[[c.at,'cobro.creado','Ana (dueña)','Plantilla '+c.tpl+' · '+money(c.amt)],[c.at,'pey.cobro_solicitado','Sistema','QR y link generados']];
+  if(s==='verificado'||s==='liberado'){L.push(['+5 min','pey.aviso_recibido','pey','Webhook: solo avisa, no libera']);L.push(['+5 min','pey.consulta_autenticada','Sistema','Pagado · monto y cuenta coinciden']);}
+  if(s==='liberado')L.push(['+5 min','liberacion.ejecutada','Sistema','Automática · cliente notificado']);
+  if(s==='revision'){L.push(['10:40','pey.aviso_recibido','pey','Webhook: solo avisa, no libera']);L.push(['10:40','pey.consulta_autenticada','Sistema','Monto recibido '+money(c.got||0)+' ≠ '+money(c.amt)]);L.push(['10:40','cobro.en_revision','Sistema','Liberación detenida']);}
+  if(s==='cerrado'){if(c.got){L.push(['17:52','pey.consulta_autenticada','Sistema','Monto recibido '+money(c.got)+' ≠ '+money(c.amt)]);L.push(['17:52','cobro.en_revision','Sistema','Liberación detenida']);}L.push([c.got?'18:10':'11:30','cobro.cerrado_sin_liberar',c.by,'Motivo: '+c.reason]);if(c.ref)L.push(['18:12','devolucion.anotada',c.by,'Devolución hecha por fuera']);}
+  if(s==='expirado')L.push(['09:05','cobro.expirado','Sistema','Sin pago durante la vigencia']);
+  return L.map(function(r){return '<tr><td class="num small">'+r[0]+'</td><td><code>'+r[1]+'</code></td><td class="small">'+r[2]+'</td><td class="small mut">'+r[3]+'</td></tr>';}).join('');
+}
+function vDetalle(){
+  var s=sub(),back='<div class="row"><button type="button" class="btn ghost sm" data-go="panel" data-st="hoy">'+ic('back')+'Cobros</button></div>';
+  if(s==='cargando')return shell('panel','<div class="body" role="status">'+back+'<p class="mut">Cargando el cobro…</p>'+sk('180px',30)+'<div class="split"><div class="card col" style="gap:16px">'+sk('100%',22)+sk('100%',22)+sk('80%',22)+'</div><div class="card col" style="gap:16px">'+sk('50%',34)+sk('100%',16)+sk('100%',16)+'</div></div></div>');
+  if(s==='no-encontrado')return shell('panel','<div class="body">'+back+'<div class="card col" style="align-items:flex-start;max-width:560px"><h2>No encontramos el cobro #999</h2><p class="mut">Puede ser de otra cuenta o el folio está mal escrito. Los folios llevan el signo # y un número, por ejemplo #128.</p><button type="button" class="btn" data-go="panel" data-st="hoy">Ver todos mis cobros</button></div></div>');
+  var c=ch(S.sel),a='';
+  if(c.st!==s){c=S.charges.filter(function(x){return x.st===s;})[0]||c;}
+  S.sel=c.id;
+  var late=c.why==='tardio';
+  if(s==='esperando')a='<button type="button" class="btn" id="dt-copy" data-act="copy" data-v="'+link(c)+'">'+ic('copy')+'Copiar link</button><button type="button" class="btn sec" data-go="pago" data-st="esperando">'+ic('qr')+'Mostrar QR</button><button type="button" class="btn sec" id="dt-wa" data-act="whatsapp">'+ic('msg')+'Reenviar por WhatsApp'+(S.plan==='gratis'?' <span class="tag pro">Pro</span>':'')+'</button><button type="button" class="btn danger" id="dt-close" data-act="dialog" data-d="cerrar">Dejar de esperar este cobro</button><p class="small mut">pey no permite anular el cobro. Si alguien paga después, el pago entra a En revisión · pago tardío.</p>';
+  if(s==='cerrado')a='<button type="button" class="btn" data-go="nuevo-cobro" data-st="formulario">Crear cobro nuevo con los mismos datos</button>'+(c.got?'<button type="button" class="btn sec" id="dt-ref" data-act="toast" data-msg="Prototipo: edita la nota de devolución hecha por fuera.">Editar nota de devolución</button>':'');
+  if(s==='verificado')a='<button type="button" class="btn" id="dt-rel" data-act="release">'+ic('checks')+'Liberar ahora</button><button type="button" class="btn sec" data-act="rules" data-v="'+(c.k==='cita'||c.k==='pedido'?c.k:'cotizacion')+'">Cambiar a liberación automática</button>';
+  if(s==='liberado')a='<button type="button" class="btn sec" id="dt-re" data-act="toast" data-msg="Prototipo: se reenvía el aviso de liberación a tu cliente.">Reenviar aviso al cliente</button><button type="button" class="btn sec" data-go="nuevo-cobro" data-st="formulario">Crear cobro igual</button>';
+  if(s==='revision')a='<button type="button" class="btn" data-go="revision" data-st="'+(c.why||'monto')+'">Revisar y decidir</button>';
+  if(s==='expirado')a='<button type="button" class="btn" data-go="nuevo-cobro" data-st="formulario">Crear cobro nuevo con los mismos datos</button><button type="button" class="btn sec" data-go="revision" data-st="tardio">Ver cómo se ve un pago tardío</button>';
+  var note={esperando:'Todavía no hay pago. No entregues con una captura: espera a ver «Pago verificado».',verificado:'pey confirmó el pago. Esta plantilla espera tu confirmación para liberar.',liberado:'<b>Pago verificado con pey · '+money(c.amt)+'.</b> '+relWord(c)+'. Avisamos a tu cliente.',revision:'Hay un pago, pero no coincide con este cobro. No se liberó nada.',cerrado:'<b>Cerrado sin liberar.</b> Motivo: '+(c.reason||'')+'. Lo decidió '+(c.by||'')+'. '+(c.got?(c.ref?'Devolución hecha por fuera, anotada.':'Sin devolución anotada.'):'No hubo pago. Si alguien paga después, el pago entra a En revisión · pago tardío.')+' Es un estado final.',expirado:'Este cobro venció sin pago. pey no permite cancelar el link ni el QR: si alguien paga después, el cobro entra a «En revisión · pago tardío» y nunca se libera solo.'}[s];
+  return shell('panel','<div class="body">'+back+
+    '<div class="row"><h2>'+c.tpl+' <span class="num">'+c.id+'</span></h2>'+badge(s,late?'pago tardío':'')+(S.demo?'<span class="tag demo">DEMO</span>':'')+'</div>'+
+    '<div class="alert '+(s==='revision'?'rev':(s==='cerrado'||s==='expirado'?'neu':'info'))+'" role="status">'+ic(ST[s].i)+'<div>'+note+'</div></div>'+
+    '<div class="split"><div class="col"><div class="card"><h3 style="font-size:16px;margin-bottom:12px">Línea de tiempo</h3>'+timeline(c,s)+'</div>'+
+    '<div class="card"><h3 style="font-size:16px;margin-bottom:8px">Bitácora</h3><div class="tw" tabindex="0" role="region" aria-label="Bitácora del cobro"><table><caption class="sr">Eventos del cobro</caption><thead><tr><th scope="col">Hora</th><th scope="col">Evento</th><th scope="col">Origen</th><th scope="col">Detalle</th></tr></thead><tbody>'+logRows(c,s)+'</tbody></table></div></div></div>'+
+    '<div class="col"><div class="card col"><p class="amt num" style="font-size:36px">'+money(c.amt)+' <span class="small mut" style="font-family:var(--bd);font-weight:400">MXN</span></p>'+
+    '<dl class="kv"><dt>Plantilla</dt><dd>'+c.tpl+'</dd><dt>Concepto</dt><dd>'+h(c.con)+'</dd><dt>Cliente</dt><dd class="num">'+(c.tel||'Sin celular')+'</dd><dt>Cuenta destino</dt><dd class="num">CLABE •••• 4417</dd><dt>Vigencia</dt><dd>'+VIG[c.k]+'</dd><dt>Creado</dt><dd>'+c.at+'</dd>'+(s==='cerrado'?'<dt>Motivo</dt><dd>'+c.reason+'</dd><dt>Lo decidió</dt><dd>'+c.by+'</dd>':'')+'</dl></div>'+
+    '<div class="card col"><h3 style="font-size:16px">Acciones</h3>'+a+'</div></div></div></div>');
+}
+
+/* ---------- 7 pago del cliente ---------- */
+function vPago(){
+  var s=sub(),c=ch(S.sel);if(c.st!=='esperando'&&/^(esperando|push|push-error|verificando|sin-conexion)$/.test(s)){c=ch('#131');}
+  if(s==='expirado')c=ch('#127');if(s==='revision')c=ch('#129');if(s==='cerrado')c=ch('#126');
+  var head='<div style="background:'+h(S.biz.color)+';color:#fff;padding:20px 20px 16px" class="dark"><div class="row"><span class="av" style="background:rgba(0,0,0,.25)" aria-hidden="true">'+h(S.biz.name.charAt(0))+'</span><b style="font-family:var(--hd);font-size:18px">'+h(S.biz.name)+'</b></div></div>'+
+    (S.demo?'<div class="demo-bar" role="status"><span class="tag demo">DEMO</span> Demostración: no se realizará un cobro real.</div>':'');
+  var foot='<p class="small mut" style="text-align:center;margin-top:8px">El pago va directo a la cuenta de '+h(S.biz.name)+'.'+(S.plan==='gratis'?' Cobro creado con PAYVRO.':'')+'</p>';
+  if(s==='cargando')return head+'<main class="center" style="max-width:480px;padding-top:20px" role="status"><p class="mut">Cargando el cobro…</p>'+sk('50%',48)+sk('70%',18)+'<div style="align-self:center">'+sk('210px',210)+'</div>'+sk('100%',44)+'</main>';
+  if(s==='no-encontrado')return '<div style="background:var(--ink);padding:20px" class="dark"><span class="logo" style="height:20px;display:block">'+LOGO_OSCURO_HTML+'</span></div><main class="center" style="max-width:480px"><h1 style="font-size:26px">Este link no corresponde a ningún cobro</h1><p class="mut">Puede estar incompleto. Pídele a quien te lo envió que te lo comparta de nuevo. No pagues con un QR que no muestre el nombre del negocio y el monto.</p></main>';
+  var sum='<p class="amt num">'+money(c.amt)+' <span style="font-size:16px;font-family:var(--bd);font-weight:400" class="mut">MXN</span></p><p>'+c.tpl+' '+c.id+' · '+h(c.con)+'</p>';
+  var b='';
+  if(s==='esperando'||s==='push'||s==='push-error'||s==='sin-conexion'){
+    b=sum+(s==='sin-conexion'?'<div class="alert err" role="alert">'+ic('wifi')+'<div><b>No pudimos actualizar el estado.</b> Revisa tu conexión. Si ya pagaste, no vuelvas a pagar. '+retry('esperando')+'</div></div>':'')+
+    '<div class="col" style="align-items:center;gap:8px"><div class="qr" style="width:210px">'+qr(11)+'</div><p style="font-weight:600;text-align:center">Paga con la app de tu banco (CoDi)</p>'+
+    '<div class="row" aria-live="polite" style="justify-content:center"><span class="badge b-wait"><span class="pulse" aria-hidden="true"></span>Esperando pago</span><span class="small mut">Se actualiza solo</span></div></div>'+
+    '<div class="card col"><h2 style="font-size:17px">¿Estás en tu celular? Abre la app de tu banco</h2>'+
+    (s==='push'?'<div class="alert info" role="status">'+ic('phone')+'<div><b>Solicitud enviada al 55 •••• 4821.</b> Ábrela en la app de tu banco, revisa el monto y autoriza. Si no aparece en un minuto, usa el QR. <button type="button" class="btn ghost sm" data-st="esperando">Cambiar número</button></div></div>':
+    '<label class="fld" for="pg-tel">Recibe la solicitud de cobro en tu celular<div class="row" style="flex-wrap:nowrap"><input class="inp num" id="pg-tel" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="10 dígitos" value="55 0000 4821"'+(s==='push-error'?' aria-invalid="true" aria-describedby="pg-tel-e"':'')+'><button type="button" class="btn" id="pg-send" data-st="push">Enviar</button></div>'+(s==='push-error'?'<span class="err" id="pg-tel-e">'+ic('alert')+'Ese número no tiene CoDi activo. Usa el número registrado en la app de tu banco o paga con el QR.</span>':'<span class="hint">El número registrado en la app de tu banco. En la app entra a CoDi y autoriza.</span>')+'</label>')+'</div>'+
+    (S.demo?'<button type="button" class="btn block" id="pg-sim" data-act="simpay">Simular pago <span class="tag demo">DEMO</span></button>':'')+
+    '<p class="small mut" style="text-align:center">'+vence(c)+'. No envíes comprobante: el negocio recibe la confirmación.</p>';
+  }else if(s==='verificando'){
+    b=sum+'<div class="card col" style="align-items:center;text-align:center" role="status" aria-live="polite"><div class="spin" aria-hidden="true"></div><h2 style="font-size:18px">Verificando con pey…</h2><p class="small mut">Todavía no está confirmado. No cierres esta página ni vuelvas a pagar.</p></div>';
+  }else if(s==='exito'){
+    var lib=c.k!=='cotizacion';
+    b='<div class="col" style="gap:10px" role="status" aria-live="polite"><svg viewBox="0 0 48 48" width="48" height="48" aria-hidden="true"><circle cx="24" cy="24" r="24" fill="#D6F2F0"/><path d="M14 25l7 7 13-15" fill="none" stroke="#04575F" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>'+
+    '<div>'+badge('verificado')+'</div><h1 style="font-size:26px">Pago verificado con pey · <span class="num">'+money(c.amt)+'</span></h1>'+
+    '<p><b>'+(lib?relWord(c):c.tpl+' '+c.id+' · pago recibido')+'</b> '+(lib?badge('liberado'):'')+'</p></div>'+
+    '<ol class="tl"><li><span class="dot">'+ic('check')+'</span><div><b>Cobro creado</b></div></li><li><span class="dot">'+ic('check')+'</span><div><b>Pago verificado</b></div></li>'+(lib?'<li><span class="dot">'+ic('checks')+'</span><div><b>Liberado</b></div></li>':'<li class="cur"><span class="dot">'+ic('clock')+'</span><div><b>Por liberar</b><span class="t">'+h(S.biz.name)+' confirma el arranque.</span></div></li>')+'</ol>'+
+    '<p class="small mut">Avisamos a '+h(S.biz.name)+'. No necesitas enviar comprobante.</p>'+
+    (S.demo?'<button type="button" class="btn sec block" data-go="detalle" data-st="'+(lib?'liberado':'verificado')+'">Ver cómo quedó en mi panel</button><button type="button" class="btn ghost block" id="pg-reset" data-act="reset">Reiniciar el recorrido</button>':'');
+  }else if(s==='expirado'){
+    b=sum+'<div class="col" style="align-items:flex-start"><span class="badge b-exp">'+ic('off')+'Expirado</span><h2 style="font-size:22px">Este cobro venció</h2><p class="mut">Pídele a '+h(S.biz.name)+' un cobro nuevo. No pagues con este link ni con su QR: un pago después de vencido no se confirma solo, queda en revisión con el negocio.</p></div>';
+  }else if(s==='cerrado'){
+    b=sum+'<div class="col" style="align-items:flex-start">'+badge('cerrado')+'<h2 style="font-size:22px">Este cobro se cerró sin liberar</h2><p class="mut">'+h(S.biz.name)+' cerró este cobro y no lo liberó. Ya no pagues con este link. Si pagaste, ponte en contacto con el negocio: las devoluciones las hace el negocio desde su banco.</p></div>';
+  }else{
+    b=sum+'<div class="col" style="align-items:flex-start"><span class="badge b-rev">'+ic('alert')+'En revisión</span><h2 style="font-size:22px">Recibimos un pago, pero no coincide con este cobro</h2><p class="mut">'+h(S.biz.name)+' lo está revisando y te contactará. <b>No vuelvas a pagar.</b> Tu dinero llegó a la cuenta del negocio; si procede una devolución, la hace el negocio desde su banco.</p></div>'+
+    '<div class="card"><dl class="kv"><dt>Monto del cobro</dt><dd class="num">'+money(c.amt)+'</dd><dt>Monto recibido</dt><dd class="num">'+money(c.got||0)+'</dd></dl></div>';
+  }
+  return head+'<main class="center" style="max-width:480px;padding-top:20px">'+b+foot+'</main>';
+}
+
+/* ---------- 8 en revision ---------- */
+function vRevision(){
+  var s=sub(),c=ch(s==='tardio'?'#127':'#129'),t,why,rowsx,av,extra='',A=c.amt,G=c.got||0;
+  if(s==='monto'){t='El monto recibido no coincide';why='Tu cliente pagó '+money(G)+' de '+money(A)+'. El dinero ya está en tu cuenta.';
+    rowsx=[['Monto',money(A),money(G),0],['Cuenta destino','CLABE •••• 4417','CLABE •••• 4417',1],['Pagos recibidos','1','1',1],['Vigencia','Dentro de plazo','Dentro de plazo',1]];av=[1,'',1,'',1,''];}
+  if(s==='cuenta'){t='El pago llegó a otra cuenta';why='pey reporta el pago en una cuenta distinta a la que tienes configurada como destino.';
+    rowsx=[['Monto',money(A),money(A),1],['Cuenta destino','CLABE •••• 4417','CLABE •••• 9021',0],['Pagos recibidos','1','1',1],['Vigencia','Dentro de plazo','Dentro de plazo',1]];av=[1,'Solo si la cuenta •••• 9021 también es tuya.',0,'No aplica: el monto está completo.',1,''];
+    extra='<button type="button" class="btn ghost sm" data-go="ajustes" data-st="pey">Revisar mi conexión con pey</button>';}
+  if(s==='duplicado'){t='Llegaron dos pagos para el mismo cobro';why='El primer pago se verificó y liberó el pedido. El segundo, por '+money(A)+', quedó sin aplicar.';
+    rowsx=[['Monto',money(A),money(A)+' × 2',0],['Cuenta destino','CLABE •••• 4417','CLABE •••• 4417',1],['Pagos recibidos','1','2',0],['Vigencia','Dentro de plazo','Dentro de plazo',1]];av=[0,'No aplica: el pedido ya se liberó con el primer pago.',0,'No aplica: no hay faltante.',1,'Cierra el segundo pago. Anota la devolución cuando la hagas desde tu banco.'];}
+  if(s==='tardio'){t='Llegó un pago después de vencido';why='El cobro venció ayer y hoy llegó el pago completo. pey no permite cancelar un link o un QR, por eso el pago entró.';
+    rowsx=[['Monto',money(A),money(A),1],['Cuenta destino','CLABE •••• 4417','CLABE •••• 4417',1],['Pagos recibidos','1','1',1],['Vigencia','Hasta hoy 09:05','Pagado hoy 10:12',0]];av=[1,'Solo si todavía puedes entregar.',0,'No aplica: el monto está completo.',1,''];}
+  var diff=A-G;
+  var acts=[['Liberar con lo recibido',av[1]||('Aceptas '+money(s==='monto'?G:A)+' como pago de este cobro y se libera.'),'accept',av[0]],
+            ['Pedir la diferencia',av[3]||('Creamos un cobro nuevo por '+money(diff)+', el faltante. Este cobro se libera cuando el nuevo quede verificado.'),'diff',av[2]],
+            ['No liberar',av[5]||'Pasa a «Cerrado sin liberar». Puedes anotar «devolución hecha por fuera».','reject',av[4]]];
+  var tb=rowsx.map(function(r){return '<tr><th scope="row" style="text-transform:none;letter-spacing:0;font-size:14px;color:var(--ink)">'+r[0]+'</th><td class="num">'+r[1]+'</td><td class="num"><b>'+r[2]+'</b></td><td>'+(r[3]?mb('ok','check','Coincide'):mb('rev','alert','No coincide'))+'</td></tr>';}).join('');
+  var done=S.revDone;
+  var ab=acts.map(function(a,i){var off=!a[3]||done;return '<div class="card row" style="align-items:flex-start;flex-wrap:nowrap;padding:14px"><div style="flex:1"><b>'+a[0]+'</b><p class="small mut">'+a[1]+'</p></div><button type="button" class="btn '+(i===0&&a[3]?'':'sec')+' sm" id="rv-'+i+'" data-act="rev" data-v="'+a[2]+'"'+(off?' aria-disabled="true"':'')+'>'+(a[3]?'Elegir':'No disponible')+'<span class="sr"> '+a[0]+'</span></button></div>';}).join('');
+  return shell('panel','<div class="body"><div class="row"><button type="button" class="btn ghost sm" data-go="detalle" data-st="'+(s==='tardio'?'expirado':'revision')+'">'+ic('back')+c.tpl+' '+c.id+'</button></div>'+
+    '<div class="row"><h2>'+t+'</h2>'+badge('revision',s==='tardio'?'pago tardío':'')+'</div>'+
+    (done?'<div class="alert info" role="status">'+ic('check')+'<div><b>Decisión registrada.</b> '+done+' Quedó en la bitácora con tu nombre y la hora. '+(S.revClosed?'<button type="button" class="btn sec sm" id="rv-see" data-act="open" data-id="#126">Ver un cobro cerrado</button> ':'')+'<button type="button" class="btn ghost sm" id="rv-undo" data-act="rev-reset">Ver las opciones otra vez</button></div></div>':
+     '<div class="alert rev" role="status">'+ic('alert')+'<div><b>No se liberó nada y no se liberará solo.</b> '+why+'</div></div>')+
+    '<div class="split"><div class="col"><div class="card"><h3 style="font-size:16px;margin-bottom:8px">Esperado contra recibido</h3><div class="tw" tabindex="0" role="region" aria-label="Esperado contra recibido"><table><caption class="sr">Comparación del cobro con el pago que reporta pey</caption><thead><tr><th scope="col">Dato</th><th scope="col">Esperado</th><th scope="col">Recibido (pey)</th><th scope="col">Resultado</th></tr></thead><tbody>'+tb+'</tbody></table></div>'+
+    '<p class="small mut" style="margin-top:8px">Consultado directo con pey hoy a las 10:40. <button type="button" class="btn ghost sm" id="rv-q" data-act="toast" data-msg="Consulta repetida con pey: sin cambios.">'+ic('refresh')+'Volver a consultar</button></p></div>'+
+    '<div class="card"><h3 style="font-size:16px;margin-bottom:8px">'+c.tpl+' '+c.id+'</h3><p class="mut">'+h(c.con)+' · '+money(A)+'</p></div></div>'+
+    '<div class="col"><h3 style="font-size:16px">Qué puedes hacer</h3>'+ab+extra+'<p class="small mut">PAYVRO no hace devoluciones: si devuelves dinero, lo haces desde tu banco y aquí solo lo anotas. Solo el dueño o un administrador pueden decidir.</p></div></div></div>');
+}
+
+/* ---------- 9 plantillas ---------- */
+function pickPair(pre,a,b,first){return '<div class="grid g2"><button type="button" class="opt" id="'+pre+'-a" aria-pressed="'+!!first+'" data-act="pick"><div><b>'+a[0]+'</b><span>'+a[1]+'</span></div></button><button type="button" class="opt" id="'+pre+'-b" aria-pressed="'+!first+'" data-act="pick"><div><b>'+b[0]+'</b><span>'+b[1]+'</span></div></button></div>';}
+function vPlantillas(){
+  var s=sub();
+  if(s==='reglas'){
+    var k=S.ruleTpl,t=tplBy(k),f='',side='';
+    var VO={pedido:['24 horas','2 horas','48 horas','7 días'],cita:['Hasta 2 h antes de la cita','Hasta 24 h antes de la cita','24 horas desde que se crea'],cotizacion:['7 días','3 días','15 días']};
+    if(k==='cita')f+='<fieldset style="border:0" class="col"><legend class="fld" style="margin-bottom:6px">Cuánto pides de anticipo</legend>'+pickPair('ci-m',['Monto fijo','El mismo para toda cita'],['Porcentaje','Del precio del servicio'],true)+'</fieldset><label class="fld" for="ci-amt">Anticipo (MXN)<input class="inp num" id="ci-amt" inputmode="decimal" value="300.00"></label>';
+    if(k==='cotizacion')f+='<label class="fld" for="co-pct">Anticipo para arrancar<select class="inp" id="co-pct"><option>50 % del total</option><option>30 % del total</option><option>100 % del total</option></select></label>';
+    if(VO[k])f+='<label class="fld" for="rg-vig"><span>El cliente tiene para pagar '+PV+'</span><select class="inp" id="rg-vig">'+VO[k].map(function(x,i){return '<option'+(i===0?' selected':'')+'>'+x+(i===0?' (por defecto)':'')+'</option>';}).join('')+'</select>'+(k==='cita'?'<span class="hint">Si no se paga a tiempo, el cobro expira y se libera el horario.</span>':'')+'</label>';
+    if(k==='mostrador')f+='<div class="fld"><span>Vigencia '+PV+'</span><dl class="kv"><dt>Etiquetas de precio fijo</dt><dd>No vencen</dd><dt>Cobro de monto libre</dt><dd>15 minutos</dd></dl></div><div class="fld"><span>Avisos hablados</span><dl class="kv"><dt>Pago verificado</dt><dd>«Recibiste $X»</dd><dt>Monto distinto al de la etiqueta</dt><dd>«Revisa este pago»</dd></dl></div>';
+    if(k==='membresia')f+='<div class="grid g2"><label class="fld" for="mb-vig">El link de pago dura (días)<input class="inp num" id="mb-vig" inputmode="numeric" value="7"></label><label class="fld" for="mb-pau">Se pausa el día<input class="inp num" id="mb-pau" inputmode="numeric" value="7"></label><label class="fld" for="mb-r1">Primer recordatorio, día<input class="inp num" id="mb-r1" inputmode="numeric" value="1"></label><label class="fld" for="mb-r2">Segundo recordatorio, día<input class="inp num" id="mb-r2" inputmode="numeric" value="3"></label><label class="fld" for="mb-r3">Último aviso, día<input class="inp num" id="mb-r3" inputmode="numeric" value="5"></label></div>'+
+      '<label class="chk" for="mb-push"><input type="checkbox" id="mb-push" checked><span><b>Aviso rápido por CoDi el día 0</b><br><span class="small mut">Llega a la app bancaria de tu cliente y dura unos minutos. El link de pago es el que cuenta.</span></span></label>'+
+      '<div class="fld"><span>Así corre cada mes</span><ol class="tl" style="margin-top:6px"><li><span class="dot">0</span><div><b>Día 0 · Pendiente de pago</b><span class="t">Se envía el link de pago y el aviso rápido por CoDi.</span></div></li><li><span class="dot">1</span><div><b>Día 1 · recordatorio</b><span class="t">A tu cliente'+(S.plan==='gratis'?' por correo':' por WhatsApp, con correo de respaldo')+' y aviso para ti.</span></div></li><li><span class="dot">3</span><div><b>Día 3 · recordatorio</b><span class="t">A tu cliente'+(S.plan==='gratis'?' por correo':' por WhatsApp, con correo de respaldo')+' y aviso para ti.</span></div></li><li><span class="dot">5</span><div><b>Día 5 · último aviso</b><span class="t">A tu cliente: «Último aviso: tu membresía se pausa en 2 días». A ti: «Se pausa en 2 días si no paga».</span></div></li><li class="rev"><span class="dot">'+ic('pause')+'</span><div><b>Día 7 · Pausada por falta de pago</b><span class="t">Tú reactivas, das más días o das de baja. Si paga, se reactiva sola.</span></div></li></ol><span class="hint">'+(S.plan==='gratis'?'En Gratis los avisos a tu cliente van por correo y tú tienes el botón «Reenviar cobro». WhatsApp automático es Pro.':'Los avisos a tu cliente salen por WhatsApp, con el correo como respaldo.')+'</span></div>';
+    if(k!=='mostrador'&&k!=='membresia')f+='<fieldset style="border:0" class="col"><legend class="fld" style="margin-bottom:6px">Al verificar el pago</legend>'+pickPair('rg-l',['Liberar solo','Automático, es lo normal'],['Esperar mi confirmación','Queda en «Pago verificado»'],k!=='cotizacion')+'</fieldset>';
+    if(k==='cita')f+='<label class="fld" for="ci-msg">Mensaje al confirmar<textarea class="inp" id="ci-msg" rows="3">Tu cita quedó confirmada. Si necesitas cambiarla, avísanos con 24 horas de anticipación.</textarea></label><label class="fld" for="ci-pol">Si el cliente cancela<select class="inp" id="ci-pol"><option>El anticipo no se devuelve</option><option>Se devuelve si avisa con 24 h</option><option>Se aplica a otra fecha</option></select><span class="hint">Se muestra al cliente antes de pagar. Las devoluciones las haces tú desde tu banco.</span></label>';
+    side=k==='cita'?'<div class="card col"><h3 style="font-size:16px">Así lo ve tu cliente</h3><div style="border:1px solid var(--line);border-radius:var(--r);overflow:hidden"><div style="background:'+h(S.biz.color)+';color:#fff;padding:12px;font-weight:600">'+h(S.biz.name)+'</div><div class="col" style="padding:14px;gap:6px"><span class="small mut">Anticipo de cita</span><b class="num" style="font-family:var(--hd);font-size:26px">$300.00</b><span class="small">Corte y color · sáb 21 nov, 11:00</span><span class="small mut">Paga antes del sáb 21 nov, 9:00. El anticipo no se devuelve.</span></div></div></div>':'';
+    side+='<div class="card col"><h3 style="font-size:16px">Cuando un cobro vence</h3><p class="small mut">Pasa a «Expirado». pey no permite cancelar el link ni el QR, así que alguien todavía podría pagarlo. Si eso pasa, el cobro entra a «En revisión · pago tardío» y nunca se libera solo.</p></div>';
+    return shell('plantillas','<div class="body"><div class="row"><button type="button" class="btn ghost sm" data-st="galeria">'+ic('back')+'Plantillas</button></div><h2>Reglas de plantilla</h2>'+
+    '<div class="tabs" role="tablist" aria-label="Plantilla">'+['pedido','cita','cotizacion','mostrador','membresia'].map(function(x){return '<button type="button" role="tab" id="rt-'+x+'" aria-selected="'+(k===x)+'" data-act="rules" data-v="'+x+'">'+tplBy(x)[1]+'</button>';}).join('')+'</div>'+
+    '<p class="mut">'+t[2]+' Estas reglas se aplican a cada cobro nuevo.</p>'+
+    '<div class="split"><div class="card col">'+f+'<div class="row"><button type="button" class="btn" id="rg-save" data-act="toast" data-msg="Reglas guardadas. Aplican a los cobros nuevos.">Guardar reglas</button><button type="button" class="btn ghost" data-st="galeria">Cancelar</button></div></div><div class="col">'+side+'</div></div></div>');
+  }
+  if(s==='membresia'||s==='membresia-vacia'){
+    var head='<div class="body"><div class="row"><button type="button" class="btn ghost sm" data-st="galeria">'+ic('back')+'Plantillas</button></div><div class="row"><h2 style="flex:1">Membresías</h2>'+(lockOf(tplBy('membresia'))?'':'<button type="button" class="btn sm" data-act="tpl-go" data-v="membresia">'+ic('plus')+'Nueva membresía</button>')+'</div>';
+    if(lockOf(tplBy('membresia')))return shell('plantillas',head+'<div class="card col" style="align-items:flex-start;max-width:640px"><span class="tag out">'+ic('lock')+'Otra plantilla</span><h3 style="font-size:20px">Tu plantilla gratis ahora es '+tplBy(S.tplFree)[1]+'</h3><p class="mut">Membresía también puede ser tu plantilla del plan Gratis: cada mes se envía un link de pago y tú ves quién está al corriente. Con Pro usas todas a la vez.</p><div class="row"><button type="button" class="btn" id="mb-swap" data-act="swap-ask" data-v="membresia">Usar Membresía</button><button type="button" class="btn ghost" data-go="plan" data-st="planes">Ver planes</button></div></div></div>');
+    if(s==='membresia-vacia')return shell('plantillas',head+'<div class="card col" style="align-items:flex-start;max-width:640px"><h3 style="font-size:20px">Aún no tienes membresías</h3><p class="mut">Crea la primera con la cuota, el día de cobro y el celular de tu cliente. Cada mes le llega un link de pago que dura 7 días.</p><button type="button" class="btn" data-act="tpl-go" data-v="membresia">'+ic('plus')+'Crear membresía</button></div></div>');
+    var M=[['Carla Ejemplo','$350.00',mb('ok','check','Al corriente'),'Próximo link: 1 dic',''],
+           ['Jorge Ejemplo','$350.00',mb('wait','clock','Pendiente de pago'),'Día 0 · link enviado hoy, vence en 7 días','p'],
+           ['Mariana Ejemplo','$500.00',mb('wait','clock','Pendiente de pago'),'Día 5 · último aviso: se pausa en 2 días','p'],
+           ['Pedro Ejemplo','$350.00',mb('rev','pause','Pausada por falta de pago'),'Día 7 · no pagó el link de noviembre','x']];
+    return shell('plantillas',head+'<div class="alert rev" role="status">'+ic('pause')+'<div><b>1 membresía está pausada por falta de pago.</b> Tú decides: reactivar, dar más días o dar de baja. Si paga, se reactiva sola.</div></div>'+
+      '<div class="card tw" style="padding:4px 8px" tabindex="0" role="region" aria-label="Membresías"><table><caption class="sr">Membresías y su estado de cobro</caption><thead><tr><th scope="col">Cliente</th><th scope="col" class="r">Cuota</th><th scope="col">Estado</th><th scope="col">Qué sigue</th><th scope="col"><span class="sr">Acciones</span></th></tr></thead><tbody>'+
+      M.map(function(m,i){return '<tr><td><b>'+m[0]+'</b></td><td class="r num">'+m[1]+'</td><td>'+m[2]+'</td><td class="small mut">'+m[3]+'</td><td class="r">'+(m[4]==='p'?'<button type="button" class="btn sec sm" id="mb-s'+i+'" data-act="toast" data-msg="Cobro reenviado a '+m[0]+(S.plan==='gratis'?' por correo.':' por WhatsApp y correo.')+'">Reenviar cobro</button>':'')+(m[4]==='x'?'<span class="row" style="justify-content:flex-end;flex-wrap:nowrap"><button type="button" class="btn sm" id="mb-r'+i+'" data-act="toast" data-msg="Membresía reactivada. Enviamos un link de pago nuevo hoy.">Reactivar</button><button type="button" class="btn sec sm" id="mb-d'+i+'" data-act="toast" data-msg="Prototipo: eliges cuántos días más. El link sigue vigente ese tiempo.">Dar más días</button><button type="button" class="btn danger sm" id="mb-b'+i+'" data-act="dialog" data-d="baja-membresia">Dar de baja</button></span>':'')+'</td></tr>';}).join('')+'</tbody></table></div>'+
+      '<p class="small mut">Link de pago de 7 días, recordatorios el día 1 y el día 3, último aviso el día 5 y pausa el día 7. Tú configuras los días. '+(S.plan==='gratis'?'En Gratis los avisos van por correo.':'Los avisos salen por WhatsApp, con correo de respaldo.')+' <button type="button" class="btn ghost sm" data-act="rules" data-v="membresia">Ver reglas</button></p></div>');
+  }
+  var o='<div class="body"><h2>Plantillas</h2><p class="mut">Cada plantilla define qué se libera cuando el pago queda verificado y cuánto dura el cobro.</p><div class="grid g3">';
+  TPLS.forEach(function(t,i){var lk=lockOf(t);
+    o+='<div class="card col" style="gap:8px"><div class="row"><h3 style="font-size:18px">'+t[1]+'</h3><span class="sp"></span>'+(lk==='pro'||lk==='business'?lockTag(lk):(lk?'':mb('ok','check','Activa')))+'</div><p class="mut small">'+t[2]+'</p>'+
+    (VIG[t[0]]?'<p class="small"><b>Vigencia:</b> '+(t[0]==='mostrador'?'etiquetas sin vencimiento; monto libre, 15 min':VIG[t[0]])+'</p>':'')+'<span class="sp"></span>'+
+    (lk==='swap'?'<div class="row"><button type="button" class="btn sec sm" id="pl-s'+i+'" data-act="swap-ask" data-v="'+t[0]+'">Usar esta en su lugar</button></div>':
+     (lk?'<button type="button" class="btn sec sm" id="pl-u'+i+'" data-act="dialog" data-d="'+(lk==='pro'?'up-plantilla':'up-business')+'">Ver qué incluye</button>':
+      '<div class="row"><button type="button" class="btn sm" id="pl-c'+i+'" data-act="tpl-go" data-v="'+t[0]+'">Cobrar con esta</button>'+(t[0]==='checkout'?'':'<button type="button" class="btn ghost sm" id="pl-r'+i+'" data-act="rules" data-v="'+t[0]+'">Reglas</button>')+(t[0]==='membresia'?'<button type="button" class="btn ghost sm" data-st="membresia">Seguimiento</button>':'')+'</div>'))+'</div>';});
+  o+='</div>'+(S.plan==='gratis'?'<div class="alert info">'+ic('grid')+'<div>Tu plan Gratis incluye <b>1 plantilla, la que elijas</b>: cualquiera, también Mostrador o Membresía. La puedes cambiar cuando quieras; con Pro las usas todas a la vez. Checkout en línea necesita la API del plan Business. <button type="button" class="btn ghost sm" data-go="plan" data-st="planes">Ver planes</button></div></div>':'')+'</div>';
+  return shell('plantillas',o);
+}
+
+/* ---------- 10 plan ---------- */
+function vPlan(){
+  if(S.os)return shell('ajustes','<div class="body"><div class="card col" style="align-items:flex-start;max-width:640px"><span class="tag">OS · código abierto</span><h2>PAYVRO OS no tiene planes ni facturación</h2><p class="mut">Es tu propia instalación, para un solo negocio: tú la instalas y la mantienes. No incluye consola de soporte, SLA ni respaldos administrados. Todo lo demás viene incluido, sin cuota.</p><button type="button" class="btn sec" data-go="panel" data-st="hoy">Ir a mis cobros</button></div></div>');
+  var s=sub(),tabs='<div class="tabs" role="tablist" aria-label="Plan y facturación"><button type="button" role="tab" id="pt-1" aria-selected="'+(s==='planes')+'" data-st="planes">Planes</button><button type="button" role="tab" id="pt-2" aria-selected="'+(s!=='planes')+'" data-st="facturacion">Facturación</button></div>';
+  if(s==='facturacion'||s==='pago-fallido'){var fail=s==='pago-fallido'&&S.plan!=='gratis';return shell('plan','<div class="body">'+tabs+
+    (fail?'<div class="alert err" role="alert">'+ic('alert')+'<div><b>No pudimos cobrar tu suscripción.</b> Tus cobros CoDi siguen funcionando igual. Actualiza tu método de pago para conservar el plan '+PLAN_N[S.plan]+'. <button type="button" class="btn sec sm" id="pf-fix" data-act="toast" data-msg="Prototipo: abre el cambio de método de pago de la suscripción.">Actualizar método de pago</button></div></div>':'')+
+    (s==='pago-fallido'&&S.plan==='gratis'?'<div class="alert info">'+ic('card')+'<div>En el plan Gratis no hay cargos, así que este estado no ocurre. Cambia el plan arriba para verlo.</div></div>':'')+
+    '<div class="split"><div class="card col"><h3 style="font-size:16px">Tu suscripción</h3><dl class="kv"><dt>Plan</dt><dd>'+PLAN_N[S.plan]+'</dd><dt>Cuota</dt><dd>'+(S.plan==='gratis'?'Sin costo':'Fija mensual · precio por definir')+'</dd><dt>Próximo cargo</dt><dd>'+(S.plan==='gratis'?'Ninguno':(fail?'Pendiente de pago':'14 dic 2026'))+'</dd><dt>Cuota por pago</dt><dd>$0.00 siempre</dd></dl>'+
+    (S.plan==='gratis'?'':'<div class="row"><button type="button" class="btn sec sm" id="pf-m" data-act="toast" data-msg="Prototipo: abre el cambio de método de pago de la suscripción.">Cambiar método de pago</button><button type="button" class="btn danger sm" id="pf-d" data-act="dialog" data-d="bajar">Bajar a Gratis</button></div>')+'</div>'+
+    '<div class="card col"><h3 style="font-size:16px">Datos fiscales</h3>'+(S.plan==='gratis'?'<p class="mut small">Los pedimos cuando contrates un plan de pago.</p>':'<dl class="kv"><dt>Razón social</dt><dd>Ana López Ejemplo</dd><dt>RFC</dt><dd class="num">XAXX010101000</dd><dt>Uso de CFDI</dt><dd>G03</dd></dl><button type="button" class="btn sec sm" style="align-self:flex-start" id="pf-e" data-act="toast" data-msg="Prototipo: edita los datos fiscales.">Editar</button>')+'</div></div>'+
+    '<div class="card"><h3 style="font-size:16px;margin-bottom:8px">Recibos</h3>'+(S.plan==='gratis'?'<p class="mut small">Aún no hay recibos. En el plan Gratis no se cobra nada.</p>':'<div class="tw"><table><caption class="sr">Recibos de la suscripción</caption><thead><tr><th scope="col">Fecha</th><th scope="col">Concepto</th><th scope="col">Estado</th><th scope="col"><span class="sr">Acciones</span></th></tr></thead><tbody><tr><td>14 nov 2026</td><td>Plan '+PLAN_N[S.plan]+' · mensual</td><td>'+(fail?mb('rev','alert','Cobro rechazado'):mb('ok','check','Pagado'))+'</td><td class="r">'+(fail?'':'<button type="button" class="btn ghost sm" id="pf-f" data-act="toast" data-msg="Prototipo: abre la factura (PDF y XML).">Factura</button>')+'</td></tr></tbody></table></div>')+'</div></div>');}
+  return shell('plan','<div class="body">'+tabs+
+    '<div class="row"><h2>Tu plan</h2></div><div class="alert info">'+ic('card')+'<div><b>Cuota fija. Nunca cobramos por pago ni comisión sobre CoDi.</b> Desde el plan Gratis ya cobras y liberas.</div></div>'+planCards(true)+
+    '<div class="card col"><h3 style="font-size:16px">Momentos en que te ofrecemos subir de plan</h3><p class="small mut">Solo aparecen cuando intentas usar algo que tu plan no incluye. Nunca bloquean un cobro en curso.</p><div class="row"><button type="button" class="btn sec sm" id="um-1" data-act="dialog" data-d="up-whatsapp">Enviar por WhatsApp</button><button type="button" class="btn sec sm" id="um-2" data-act="dialog" data-d="up-usuarios">Invitar a otro usuario</button><button type="button" class="btn sec sm" id="um-3" data-act="dialog" data-d="up-plantilla">Usar varias plantillas</button><button type="button" class="btn sec sm" id="um-4" data-act="dialog" data-d="up-business">Usar API o webhooks</button></div></div></div>');
+}
+
+/* ---------- 11 ajustes ---------- */
+function vAjustes(){
+  var s=sub(),tabs=[['negocio','Negocio'],['equipo','Equipo y roles'],['pey','Conexión pey'],['api','API y webhooks'],['bitacora','Seguridad']],cur=s.split('-')[0];
+  if(S.os)tabs.splice(3,0,['conexiones','WhatsApp y agente']);
+  var o='<div class="body"><h2>Ajustes</h2><div class="tabs" role="tablist" aria-label="Secciones de ajustes">'+tabs.map(function(t){return '<button type="button" role="tab" id="aj-'+t[0]+'" aria-selected="'+(cur===t[0])+'" data-st="'+t[0]+'">'+t[1]+(t[0]==='api'&&S.plan!=='business'?' <span class="tag">Business</span>':'')+'</button>';}).join('')+'</div>';
+  if(s==='negocio'){
+    o+='<div class="split"><div class="card col"><label class="fld" for="aj-name">Nombre del negocio<input class="inp" id="aj-name" maxlength="40" value="'+h(S.biz.name)+'" data-bind="name"></label>'+
+    '<label class="fld" for="aj-giro">Giro<select class="inp" id="aj-giro">'+GIROS.map(function(g){return '<option'+(g[0]===S.biz.giro?' selected':'')+'>'+g[0]+'</option>';}).join('')+'</select></label>'+
+    '<div class="fld"><span id="acol-l">Color de tu página de pago</span>'+swatches('acol')+'<span class="hint">Solo ofrecemos colores con contraste suficiente para texto blanco.</span></div>'+
+    '<div class="fld"><span>Marca propia '+(S.plan==='gratis'?'<span class="tag pro">Pro</span>':'')+'</span><span class="hint">'+(S.plan==='gratis'?'En Gratis la página de pago dice «Cobro creado con PAYVRO». Con Pro esa línea desaparece.':'Tu página de pago muestra solo tu logo y tu color.')+'</span></div>'+
+    '<button type="button" class="btn" style="align-self:flex-start" id="aj-save" data-act="toast" data-msg="Cambios guardados.">Guardar cambios</button></div>'+
+    '<div class="card col"><h3 style="font-size:16px">Vista previa</h3><div style="border:1px solid var(--line);border-radius:var(--r);overflow:hidden"><div style="background:'+h(S.biz.color)+';color:#fff;padding:12px;font-weight:600" class="row"><span class="av" style="background:rgba(0,0,0,.25)" aria-hidden="true">'+h(S.biz.name.charAt(0))+'</span>'+h(S.biz.name)+'</div><div style="padding:14px" class="col"><b class="num" style="font-family:var(--hd);font-size:26px">$450.00</b><span class="badge b-wait" style="align-self:flex-start">'+ic('clock')+'Esperando pago</span>'+(S.plan==='gratis'?'<span class="small mut">Cobro creado con PAYVRO.</span>':'')+'</div></div><button type="button" class="btn ghost sm" data-go="pago" data-st="esperando">Abrir página de pago</button></div></div>';
+  }else if(s==='equipo'){
+    var multi=S.plan!=='gratis',biz=S.plan==='business';
+    o+='<div class="row"><p class="mut" style="flex:1">'+(multi?'Cada persona entra con su propio correo. Lo que hace queda en bitácora.':'Tu plan Gratis incluye 1 usuario.')+'</p><button type="button" class="btn sm" id="eq-inv" data-act="'+(multi?'toast':'dialog')+'" data-d="up-usuarios" data-msg="Prototipo: pide correo y rol, y envía la invitación.">'+ic('plus')+'Invitar usuario'+(multi?'':' <span class="tag out">Pro</span>')+'</button></div>'+
+    '<div class="card tw" style="padding:4px 8px" tabindex="0" role="region" aria-label="Usuarios"><table><caption class="sr">Usuarios del negocio</caption><thead><tr><th scope="col">Persona</th><th scope="col">Rol</th>'+(biz?'<th scope="col">Sucursal</th>':'')+'<th scope="col">Último acceso</th></tr></thead><tbody><tr><td><b>Ana López</b><br><span class="small mut">ana@ejemplo.mx</span></td><td>Dueña</td>'+(biz?'<td>Todas</td>':'')+'<td class="small">Hoy 11:02</td></tr>'+
+    (multi?'<tr><td><b>Sofía Ejemplo</b><br><span class="small mut">sofia@ejemplo.mx</span></td><td><label class="sr" for="rol-0">Rol de Sofía</label><select class="inp" id="rol-0" style="font-size:15px;max-width:180px"><option>Administrador</option><option>Cajero</option></select></td>'+(biz?'<td><label class="sr" for="suc-0">Sucursal de Sofía</label><select class="inp" id="suc-0" style="font-size:15px;max-width:160px"><option>Todas</option><option>Centro</option><option>Norte</option></select></td>':'')+'<td class="small">Hoy 09:30</td></tr><tr><td><b>Luis Ejemplo</b><br><span class="small mut">luis@ejemplo.mx</span></td><td><label class="sr" for="rol-1">Rol de Luis</label><select class="inp" id="rol-1" style="font-size:15px;max-width:180px"><option>Cajero</option><option>Administrador</option></select></td>'+(biz?'<td><label class="sr" for="suc-1">Sucursal de Luis</label><select class="inp" id="suc-1" style="font-size:15px;max-width:160px"><option>Centro</option><option>Norte</option><option>Todas</option></select></td>':'')+'<td class="small">Ayer 19:40</td></tr>':'')+'</tbody></table></div>'+
+    (multi?'<div class="card row"><div style="flex:1"><b>Agente</b> <span class="tag out">Función</span><p class="small mut">No es un usuario: es una función que crea cobros por ti cuando se lo pides. Nunca cambia la cuenta destino ni decide un cobro en revisión.</p></div>'+mb('ok','check','Activo')+'</div>':'')+
+    '<div class="card"><div class="row" style="margin-bottom:8px"><h3 style="font-size:16px;flex:1">Qué puede hacer cada rol</h3>'+(biz?'<button type="button" class="btn sec sm" id="eq-fine" data-act="toast" data-msg="Prototipo: abre los permisos finos por rol y sucursal.">Permisos finos</button>':'')+'</div><div class="tw" tabindex="0" role="region" aria-label="Permisos por rol"><table><caption class="sr">Permisos por rol</caption><thead><tr><th scope="col">Permiso</th><th scope="col">Dueño</th><th scope="col">Administrador</th><th scope="col">Cajero</th><th scope="col">Agente (función)</th></tr></thead><tbody>'+
+    [['Crear cobros',1,1,1,1],['Ver todos los cobros',1,1,0,1],['Decidir cobros en revisión',1,1,0,0],['Cambiar plantillas y reglas',1,1,0,0],['Invitar usuarios y cambiar el plan',1,0,0,0],['Cambiar la llave de pey o la cuenta destino',1,0,0,0]].map(function(r){return '<tr><th scope="row" style="text-transform:none;letter-spacing:0;font-size:14px;color:var(--ink);font-weight:400">'+r[0]+'</th>'+r.slice(1).map(function(v){return '<td>'+(v?'<span class="row" style="gap:4px;color:var(--ok-fg);flex-wrap:nowrap">'+ic('check')+'Sí</span>':'<span class="mut">No</span>')+'</td>';}).join('')+'</tr>';}).join('')+
+    '</tbody></table></div><p class="small mut" style="margin-top:8px">'+(S.plan==='gratis'?'Los roles Administrador y Cajero y el Agente llegan con Pro.':(S.os?'En PAYVRO OS el equipo y los roles vienen incluidos en tu instalación.':biz?'Con Business cada rol se asigna por sucursal y puedes ajustar permisos uno por uno.':'Sucursales, roles por sucursal y permisos finos llegan con Business.'))+'</p></div>';
+  }else if(s==='pey'||s==='pey-error'){
+    var bad=s==='pey-error';
+    o+=(bad?'<div class="alert err" role="alert">'+ic('alert')+'<div><b>pey rechazó tu llave desde hoy 10:15.</b> No se pueden crear cobros nuevos. Los cobros ya creados se siguen verificando. Reemplaza la llave para continuar.</div></div>':'')+
+    '<div class="split"><div class="card col"><div class="row"><h3 style="font-size:16px">Estado de la conexión</h3><span class="sp"></span>'+(bad?mb('rev','alert','Llave rechazada'):(S.demo?(S.os?mb('exp','clock','Sin conectar · DEMO'):mb('wait','clock','En validación · 5–7 días hábiles')):mb('ok','check','Conectada')))+'</div>'+
+    '<dl class="kv"><dt>Llave de API</dt><dd>'+(S.demo&&!bad?'Aún no hay llave':'Guardada el 14 nov 2026 · no se puede ver')+'</dd><dt>Cuenta destino</dt><dd class="num">CLABE •••• 4417</dd><dt>Última consulta a pey</dt><dd>'+(S.demo?'Sin consultas reales (DEMO)':'Hoy 11:02 · correcta')+'</dd><dt>Avisos de pey (webhook)</dt><dd>'+(S.demo?'Simulados':'Recibiendo')+'</dd></dl>'+
+    '<div class="row"><button type="button" class="btn '+(bad?'':'sec')+' sm" id="py-k" data-act="dialog" data-d="llave">'+ic('key')+(S.demo&&!bad?'Pegar mi llave de pey':'Reemplazar llave')+'</button><button type="button" class="btn sec sm" id="py-t" data-act="toast" data-msg="'+(S.demo?'En DEMO no hay conexión real que probar.':'Conexión correcta: pey respondió en la consulta de prueba.')+'">'+ic('refresh')+'Probar conexión</button></div>'+
+    (S.demo&&!bad&&S.os?'<div class="alert info">'+ic('key')+'<div>En PAYVRO OS traes tus propias llaves de pey. Pégalas aquí cuando las tengas; mientras tanto todo funciona en DEMO.</div></div>':'')+(S.demo&&!bad&&!S.os?'<div class="alert info">'+ic('clock')+'<div>La validación de tu CLABE tarda de 5 a 7 días hábiles; mientras tanto puedes cobrar en modo DEMO. Te avisamos por correo.</div></div>':'')+'</div>'+
+    '<div class="card col"><h3 style="font-size:16px">Cómo protegemos esta conexión</h3><ul class="small col" style="gap:8px;padding-left:18px"><li>La llave se guarda cifrada y nunca llega a tu navegador. Solo se puede reemplazar.</li><li>Cambiar la llave o la cuenta destino pide iniciar sesión de nuevo y solo puede hacerlo el dueño.</li><li>Un pago se da por verificado con una consulta directa a pey. El aviso por webhook solo nos dice cuándo consultar.</li><li>Cada cambio queda en la bitácora de seguridad.</li></ul></div></div>';
+  }else if(s==='api'||s==='api-vacio'){
+    if(S.plan!=='business')o+='<div class="card col" style="align-items:flex-start;max-width:640px"><span class="tag">'+ic('lock')+'Business</span><h3 style="font-size:20px">API, MCP y webhooks</h3><p class="mut">Crea cobros desde tu tienda o tu agente y recibe un aviso firmado cuando el pago quede verificado y el cobro se libere.</p><ul class="small col" style="gap:6px;padding-left:18px"><li>Llaves de API con permisos por sucursal</li><li>Servidor MCP para tu agente</li><li>Webhooks firmados con reintentos</li></ul><button type="button" class="btn" data-go="plan" data-st="planes">Ver plan Business</button></div>';
+    else if(s==='api-vacio')o+='<div class="split"><div class="card col" style="align-items:flex-start"><h3 style="font-size:18px">Aún no hay llaves de API</h3><p class="mut">Crea una para que tu tienda o tu agente generen cobros. Se muestra una sola vez.</p><button type="button" class="btn" id="ak-new" data-act="dialog" data-d="nueva-llave">'+ic('plus')+'Crear llave</button></div><div class="card col" style="align-items:flex-start"><h3 style="font-size:18px">Aún no hay destinos de webhook</h3><p class="mut">Agrega la URL donde quieres recibir «cobro verificado», «cobro liberado» y «cobro en revisión».</p><button type="button" class="btn sec" id="wh-new" data-act="toast" data-msg="Prototipo: pide la URL y los eventos a escuchar.">'+ic('plus')+'Agregar destino</button></div></div>';
+    else o+='<div class="card"><div class="row" style="margin-bottom:8px"><h3 style="font-size:16px">Llaves de API</h3><span class="sp"></span><button type="button" class="btn sm" id="ak-new" data-act="dialog" data-d="nueva-llave">'+ic('plus')+'Crear llave</button></div><div class="tw" tabindex="0" role="region" aria-label="Llaves de API"><table><caption class="sr">Llaves de API</caption><thead><tr><th scope="col">Nombre</th><th scope="col">Llave</th><th scope="col">Permisos</th><th scope="col">Último uso</th><th scope="col"><span class="sr">Acciones</span></th></tr></thead><tbody><tr><td><b>Tienda en línea</b></td><td class="num">pv_live_••••••••</td><td class="small">Crear y consultar cobros</td><td class="small">Hoy 10:58</td><td class="r"><button type="button" class="btn danger sm" id="ak-r0" data-act="dialog" data-d="revocar">Revocar</button></td></tr><tr><td><b>Agente (MCP)</b></td><td class="num">pv_live_••••••••</td><td class="small">Crear cobros</td><td class="small">Ayer 17:12</td><td class="r"><button type="button" class="btn danger sm" id="ak-r1" data-act="dialog" data-d="revocar">Revocar</button></td></tr></tbody></table></div><p class="small mut" style="margin-top:8px">Una llave se muestra una sola vez, al crearla. Ninguna llave puede cambiar la cuenta destino.</p></div>'+
+      '<div class="card"><div class="row" style="margin-bottom:8px"><h3 style="font-size:16px">Webhooks</h3><span class="sp"></span><button type="button" class="btn sec sm" id="wh-new" data-act="toast" data-msg="Prototipo: pide la URL y los eventos a escuchar.">'+ic('plus')+'Agregar destino</button></div><div class="tw" tabindex="0" role="region" aria-label="Destinos de webhook"><table><caption class="sr">Destinos de webhook</caption><thead><tr><th scope="col">URL</th><th scope="col">Eventos</th><th scope="col">Último envío</th><th scope="col">Estado</th></tr></thead><tbody><tr><td class="small num">https://tienda.ejemplo.mx/payvro</td><td class="small"><code>cobro.verificado</code> <code>cobro.liberado</code> <code>cobro.en_revision</code></td><td class="small">Hoy 10:58 · 200</td><td>'+mb('ok','check','Entregando')+'</td></tr><tr><td class="small num">https://erp.ejemplo.mx/hooks</td><td class="small"><code>cobro.liberado</code></td><td class="small">Hoy 09:52 · 500</td><td>'+mb('rev','alert','Fallando · 3 reintentos')+'</td></tr></tbody></table></div></div>';
+  }else if(s==='conexiones'){
+    if(!S.os)o+='<div class="card col" style="align-items:flex-start;max-width:640px"><span class="tag">OS · código abierto</span><h3 style="font-size:20px">Esta sección solo existe en PAYVRO OS</h3><p class="mut">En Cloud, WhatsApp y el agente ya vienen conectados desde el plan Pro. En OS cada instalación conecta su propio número y su propio modelo.</p><button type="button" class="btn sec" id="cx-os" data-act="set-os">Ver como PAYVRO OS</button></div>';
+    else o+='<p class="mut">En PAYVRO OS, WhatsApp y el agente vienen incluidos, pero se conectan con tu propia cuenta.</p><div class="grid g2">'+
+      '<div class="card col"><div class="row"><h3 style="font-size:18px">WhatsApp</h3><span class="sp"></span>'+(S.osWa?mb('ok','check','Conectado'):mb('exp','clock','Sin conectar'))+'</div><p class="mut small">Para enviar cobros y recordatorios desde PAYVRO con tu propio número de WhatsApp Business.</p>'+(S.osWa?'<dl class="kv"><dt>Número</dt><dd class="num">55 •••• 0000</dd></dl><button type="button" class="btn sec sm" style="align-self:flex-start" id="cx-wa" data-act="os-wa">Desconectar</button>':'<button type="button" class="btn" style="align-self:flex-start" id="cx-wa" data-act="os-wa">'+ic('msg')+'Conecta tu número de WhatsApp</button><p class="small mut">Mientras no lo conectes, copias el link y lo pegas tú en el chat.</p>')+'</div>'+
+      '<div class="card col"><div class="row"><h3 style="font-size:18px">Agente</h3><span class="sp"></span>'+(S.osModel?mb('ok','check','Conectado'):mb('exp','clock','Sin conectar'))+'</div><p class="mut small">El agente crea cobros cuando se lo pides. Usa el modelo de tu propia cuenta; nunca cambia la cuenta destino ni decide un cobro en revisión.</p>'+(S.osModel?'<dl class="kv"><dt>Llave del modelo</dt><dd>Guardada · no se puede ver</dd></dl><button type="button" class="btn sec sm" style="align-self:flex-start" id="cx-md" data-act="os-model">Desconectar</button>':'<button type="button" class="btn" style="align-self:flex-start" id="cx-md" data-act="os-model">'+ic('key')+'Conecta tu modelo</button>')+'</div></div>'+
+      '<div class="card col"><h3 style="font-size:16px">Lo que PAYVRO OS no incluye</h3><ul class="small col" style="gap:6px;padding-left:18px"><li>Más de un negocio por instalación.</li><li>Plan y facturación.</li><li>«Ayúdame a abrir mi cuenta pey»: traes tus propias llaves.</li><li>Consola de soporte, SLA y respaldos administrados: los respaldos los haces tú.</li></ul><p class="small mut">Lo demás viene incluido: todas las plantillas, equipo y sucursales, API, MCP y webhooks.</p></div>';
+  }else if(s==='bitacora-vacia'){
+    o+='<div class="card col" style="align-items:flex-start;max-width:640px"><h3 style="font-size:18px">Aún no hay eventos de seguridad</h3><p class="mut">Aquí quedan los accesos, los cambios en la conexión con pey, los cambios de roles y las decisiones sobre cobros en revisión. No se pueden editar ni borrar.</p></div>';
+  }else{
+    o+='<div class="row"><p class="mut" style="flex:1">Cambios sensibles en tu cuenta. No se pueden editar ni borrar.</p><label class="sr" for="bt-f">Filtrar eventos</label><select class="inp" id="bt-f" style="max-width:240px;font-size:15px"><option>Todos los eventos</option><option>Accesos</option><option>Conexión pey</option><option>Equipo y roles</option><option>Decisiones en revisión</option></select></div>'+
+    '<div class="card tw" style="padding:4px 8px" tabindex="0" role="region" aria-label="Bitácora de seguridad"><table><caption class="sr">Bitácora de seguridad</caption><thead><tr><th scope="col">Fecha</th><th scope="col">Evento</th><th scope="col">Quién</th><th scope="col">Desde</th></tr></thead><tbody>'+
+    [['Hoy 11:02','Inicio de sesión','Ana López','Chrome · CDMX'],['Hoy 10:41','Cobro #129 pasó a «En revisión»','Sistema','Sin dispositivo'],['Hoy 09:15','Llave de pey guardada','Ana López','Chrome · CDMX'],['Ayer 19:40','Inicio de sesión','Luis Ejemplo','Android · CDMX'],['Ayer 18:20','Intento de cambiar la cuenta destino, bloqueado','Agente','API'],['12 nov 16:03','Usuario invitado como Cajero','Ana López','Chrome · CDMX']].map(function(r){return '<tr><td class="small num">'+r[0]+'</td><td>'+r[1]+'</td><td class="small">'+r[2]+'</td><td class="small mut">'+r[3]+'</td></tr>';}).join('')+'</tbody></table></div>';
+  }
+  return shell('ajustes',o+'</div>');
+}
+
+/* ---------- 12 mostrador ---------- */
+function padAmt(){return (parseInt(S.pad||'0',10)/100);}
+function vMostrador(){
+  var s=sub(),et=s.indexOf('etiquetas')===0,lk=lockOf(tplBy('mostrador'));
+  var top='<div class="bar"><span class="iso" style="height:24px">'+ISO+'</span><b>Mostrador · '+h(S.biz.name)+'</b>'+(S.demo?'<span class="tag demo">DEMO</span>':'')+'<span class="sp"></span><div class="chips" role="group" aria-label="Modo"><button type="button" class="chip" id="ms-t" aria-pressed="'+!et+'" data-st="teclado">Cobrar</button><button type="button" class="chip" id="ms-e" aria-pressed="'+et+'" data-st="etiquetas">Etiquetas QR</button></div><button type="button" class="btn ghost sm hide-m" data-go="panel" data-st="hoy">Salir</button></div>';
+  if(lk)top='<div class="alert info" style="border-radius:0;border-width:0 0 1px">'+ic('lock')+'<div>Tu plan Gratis usa 1 plantilla a la vez y ahora es <b>'+tplBy(S.tplFree)[1]+'</b>. Mostrador también puede ser tu plantilla gratis. <button type="button" class="btn sec sm" id="ms-swap" data-act="swap-ask" data-v="mostrador">Usar Mostrador</button> <button type="button" class="btn ghost sm" data-go="plan" data-st="planes">Ver planes</button></div></div>'+top;
+  var b;
+  if(s==='teclado'||s==='sin-conexion'){var off=s==='sin-conexion';
+    b=(off?'<div class="alert err" role="alert" style="margin-bottom:16px">'+ic('wifi')+'<div><b>Sin conexión a internet.</b> No se puede crear un cobro ni verificar pagos. Las etiquetas QR impresas siguen aceptando pagos; los verás aquí al reconectar. '+retry('teclado')+'</div></div>':'')+
+    '<div class="grid g2" style="align-items:stretch;gap:24px"><div class="col" style="justify-content:center"><p class="small mut">Monto a cobrar</p><p class="amt num" aria-live="polite" id="ms-amt">'+money(padAmt())+'</p><label class="fld" for="ms-con">Concepto <span class="hint">(opcional)</span><input class="inp" id="ms-con" value="" placeholder="Ej. combo desayuno"></label><button type="button" class="btn lg block" id="ms-go" data-act="pad-go"'+(padAmt()>0&&!off?'':' aria-disabled="true"')+'>'+ic('qr')+'Mostrar QR</button><p class="small mut">El QR de monto libre dura 15 minutos. '+PV+'</p></div>'+
+    '<div class="pad" role="group" aria-label="Teclado de monto">'+['1','2','3','4','5','6','7','8','9','00','0','del'].map(function(k){return '<button type="button" id="pk-'+k+'" data-act="pad" data-v="'+k+'"'+(k==='del'?' aria-label="Borrar último dígito"':'')+'>'+(k==='del'?'⌫':k)+'</button>';}).join('')+'</div></div>';
+  }else if(s==='qr'){
+    b='<div class="col" style="align-items:center;text-align:center"><p class="amt num">'+money(padAmt())+'</p><div class="qr" style="width:min(320px,80%)">'+qr(23)+'</div><div class="row" aria-live="polite" style="justify-content:center"><span class="badge b-wait" style="font-size:16px;padding:6px 14px"><span class="pulse" aria-hidden="true"></span>Esperando pago</span><span class="mut">Vence en 14:32</span></div><p class="mut">Pide a tu cliente que lo escanee con la app de su banco. No entregues todavía.</p>'+
+    '<div class="row" style="justify-content:center">'+(S.demo?'<button type="button" class="btn" id="ms-pay" data-act="pad-pay">Simular pago <span class="tag demo">DEMO</span></button>':'')+'<button type="button" class="btn sec" id="ms-x" data-act="dialog" data-d="cerrar">Cobrar otra cosa</button></div></div>';
+  }else if(s==='recibido'){
+    b='<div class="col" style="align-items:center;text-align:center" role="status" aria-live="assertive"><span class="badge b-ok" style="font-size:16px;padding:6px 14px">'+ic('check')+'Pago verificado</span><p class="mut">Recibiste</p><p class="amt num" style="font-size:72px">'+money(padAmt())+'</p><p class="row" style="justify-content:center">'+ic('sound')+'<span>Aviso hablado: «Recibiste '+money(padAmt()).replace('$','')+' pesos»</span></p>'+
+    '<div class="row" style="justify-content:center"><button type="button" class="btn lg" id="ms-next" data-act="pad-new">Siguiente cobro</button><button type="button" class="btn sec" id="ms-say" data-act="speak" data-v="ok">'+ic('sound')+'Repetir aviso</button></div><p class="small mut">Ya puedes entregar. El cobro quedó liberado en tu panel.</p></div>';
+  }else if(s==='revisa'){
+    b='<div class="col" style="align-items:center;text-align:center" role="alert"><span class="badge b-rev" style="font-size:16px;padding:6px 14px">'+ic('alert')+'En revisión</span><h2 style="font-size:40px">Revisa este pago</h2><p style="max-width:520px">Llegó un pago de <b class="num">$36.00</b> a la etiqueta <b>Concha</b>, que cuesta <b class="num">$18.00</b>. No sonó «Recibiste».</p><p class="row" style="justify-content:center">'+ic('sound')+'<span>Aviso hablado: «Revisa este pago»</span></p>'+
+    '<div class="row" style="justify-content:center"><button type="button" class="btn lg" data-go="revision" data-st="monto">Revisar y decidir</button><button type="button" class="btn sec" id="ms-say" data-act="speak" data-v="rev">'+ic('sound')+'Repetir aviso</button><button type="button" class="btn ghost" data-st="etiquetas">Seguir cobrando</button></div><p class="small mut">No entregues de más ni des cambio todavía. El pago queda en revisión hasta que decidas.</p></div>';
+  }else if(s==='vencido'){
+    b='<div class="col" style="align-items:center;text-align:center"><span class="badge b-exp" style="font-size:16px;padding:6px 14px">'+ic('off')+'Expirado</span><h2 style="font-size:32px">Este QR venció</h2><p class="mut" style="max-width:520px">Pasaron 15 minutos sin pago. Quítalo de la vista de tu cliente y crea otro. Si alguien lo paga después, entra a «En revisión · pago tardío» y no se libera solo.</p><button type="button" class="btn lg" id="ms-again" data-act="pad-go">Crear otro por '+money(padAmt())+'</button><button type="button" class="btn ghost" data-st="teclado">Cambiar monto</button></div>';
+  }else if(s==='etiquetas-vacio'){
+    b='<div class="card col" style="align-items:flex-start;max-width:560px;align-self:center"><h2 style="font-size:22px">Aún no tienes etiquetas</h2><p class="mut">Una etiqueta es un QR con precio fijo que imprimes y pegas junto al producto. Tu cliente la escanea y paga sin que teclees nada.</p><button type="button" class="btn" id="et-new" data-act="toast" data-msg="Prototipo: pide nombre y precio, y genera la etiqueta.">'+ic('plus')+'Crear mi primera etiqueta</button></div>';
+  }else{
+    b='<div class="col"><div class="row"><h2 style="flex:1">Etiquetas QR de precio fijo</h2><button type="button" class="btn sm" id="et-new" data-act="toast" data-msg="Prototipo: pide nombre y precio, y genera la etiqueta.">'+ic('plus')+'Nueva etiqueta</button></div><p class="mut">Imprímelas y pégalas junto al producto. No vencen. Cada pago crea su propio cobro y suena el aviso en este dispositivo.</p><div class="grid g3">'+
+    [['Café americano',35,5],['Concha',18,9],['Combo desayuno',85,13]].map(function(e,i){return '<div class="card col" style="align-items:center;text-align:center;gap:8px"><b>'+e[0]+'</b><span class="num" style="font-family:var(--hd);font-weight:700;font-size:28px">'+money(e[1])+'</span><div class="qr" style="width:140px">'+qr(e[2])+'</div><span class="small mut">Paga con CoDi · '+h(S.biz.name)+'</span><div class="row" style="justify-content:center"><button type="button" class="btn sec sm" id="et-p'+i+'" data-act="toast" data-msg="Prototipo: abre la etiqueta lista para imprimir.">Imprimir</button><button type="button" class="btn ghost sm" id="et-e'+i+'" data-act="toast" data-msg="Cambiar el precio genera un QR nuevo. El anterior no se puede cancelar: retíralo, porque un pago ahí entra a En revisión.">Cambiar precio</button></div></div>';}).join('')+'</div>'+
+    '<div class="card"><h3 style="font-size:16px;margin-bottom:8px">Pagos de hoy por etiqueta</h3><div class="tw" tabindex="0" role="region" aria-label="Pagos por etiqueta"><table><caption class="sr">Pagos recibidos por etiqueta</caption><thead><tr><th scope="col">Hora</th><th scope="col">Etiqueta</th><th scope="col" class="r">Monto</th><th scope="col">Estado</th><th scope="col">Aviso</th></tr></thead><tbody><tr><td class="num small">11:14</td><td>Café americano</td><td class="r num">$35.00</td><td>'+badge('liberado')+'</td><td class="small">«Recibiste 35 pesos»</td></tr><tr><td class="num small">10:52</td><td>Combo desayuno</td><td class="r num">$85.00</td><td>'+badge('liberado')+'</td><td class="small">«Recibiste 85 pesos»</td></tr><tr><td class="num small">10:47</td><td>Concha</td><td class="r num">$36.00</td><td>'+badge('revision')+'</td><td class="small">«Revisa este pago» <button type="button" class="btn ghost sm" data-st="revisa">Ver</button></td></tr></tbody></table></div><p class="small mut" style="margin-top:8px">Un monto distinto al de la etiqueta entra a «En revisión»: no suena «Recibiste», suena «Revisa este pago».</p></div></div>';
+  }
+  return demoBar()+top+'<div class="body" style="padding:24px;min-height:520px;justify-content:center">'+b+'</div>';
+}
+
+/* ---------- 13 PAYVRO OS ---------- */
+function osSteps(n){var l=['Dueño','Tu negocio','Cobros'],o='<div class="steps" aria-label="Paso '+Math.min(n,3)+' de 3">';
+  l.forEach(function(t,i){var c=i+1<n?'ok':(i+1===n?'on':'');o+='<span class="'+c+'"><i>'+(i+1<n?'✓':(i+1))+'</i>'+t+'</span>'+(i<2?'<span aria-hidden="true">—</span>':'');});return o+'</div>';}
+function vOS(){
+  var s=sub(),top=onbTop('<span class="tag">OS · código abierto</span>'),o='<div class="center" style="max-width:620px">';
+  var foot='<p class="small mut">PAYVRO OS es para un solo negocio por instalación. La llave se guarda cifrada en tu propia instalación; GNOSIX no la recibe. Sin consola de soporte, SLA ni respaldos administrados.</p>';
+  if(s==='inicio'){
+    o+=mb('ok','server','Instalado por tu agente')+'<h1 style="font-size:28px">Tu PAYVRO ya está instalado</h1><p class="mut">Tu agente dejó lista la instalación. Faltan tres pasos que haces tú, en un par de minutos.</p>'+
+    '<div class="card"><ol class="tl"><li><span class="dot">'+ic('check')+'</span><div><b>Aplicación en línea</b><span class="t num">https://cobros.tu-negocio.example</span></div></li><li><span class="dot">'+ic('check')+'</span><div><b>Base de datos lista</b><span class="t">Cobros, estados y bitácora</span></div></li><li><span class="dot">'+ic('check')+'</span><div><b>Dirección para avisos de pey</b><span class="t num">…/api/pey/webhook <button type="button" class="btn ghost sm" id="os-cp" data-act="copy" data-v="https://cobros.tu-negocio.example/api/pey/webhook">'+ic('copy')+'Copiar</button></span></div></li>'+
+    '<li class="todo"><span class="dot">1</span><div><b>Crear al usuario dueño</b><span class="t">La primera persona que entra queda como dueño.</span></div></li><li class="todo"><span class="dot">2</span><div><b>Perfil de tu negocio</b><span class="t">Giro, nombre, logo y color.</span></div></li><li class="todo"><span class="dot">3</span><div><b>Conectar tu cuenta pey</b><span class="t">Llave y cuenta, o sigues en DEMO.</span></div></li></ol></div>'+
+    '<button type="button" class="btn block" id="os-go" data-st="dueno">Empezar</button>'+foot;
+  }else if(s==='dueno'){
+    o+=osSteps(1)+'<h1 style="font-size:28px">Crea al usuario dueño</h1><p class="mut">Eres la primera persona en entrar a esta instalación, así que quedas como dueño. Después puedes invitar a tu equipo.</p>'+
+    '<label class="fld" for="os-nom">Tu nombre<input class="inp" id="os-nom" autocomplete="name" value="Ana López"></label>'+
+    '<label class="fld" for="os-mail">Correo<input class="inp" id="os-mail" type="email" autocomplete="email" value="ana@ejemplo.mx"></label>'+
+    '<label class="fld" for="os-pass">Contraseña<input class="inp" id="os-pass" type="password" autocomplete="new-password" value="ejemplo123"><span class="hint">Mínimo 8 caracteres. Se guarda en tu instalación.</span></label>'+
+    '<div class="row"><button type="button" class="btn sec" data-st="inicio">Atrás</button><button type="button" class="btn" style="flex:1" id="os-go" data-st="negocio">Continuar</button></div>';
+  }else if(s==='negocio'){
+    o+=osSteps(2)+'<h1 style="font-size:28px">Tu negocio</h1><p class="mut">Así te verá tu cliente en la página de pago.</p>'+
+    '<label class="fld" for="os-giro">Giro<select class="inp" id="os-giro">'+GIROS.map(function(g){return '<option'+(g[0]===S.biz.giro?' selected':'')+'>'+g[0]+'</option>';}).join('')+'</select><span class="hint">Así preparamos tus plantillas.</span></label>'+
+    '<label class="fld" for="os-bn">Nombre<input class="inp" id="os-bn" maxlength="40" value="'+h(S.biz.name)+'" data-bind="name"></label>'+
+    '<div class="fld"><span>Logo <span class="hint">(opcional)</span></span><div class="row"><span class="av" style="width:56px;height:56px;font-size:24px;background:'+h(S.biz.color)+'" aria-hidden="true">'+h(S.biz.name.charAt(0)||'N')+'</span><button type="button" class="btn sec sm" id="os-logo" data-act="toast" data-msg="Prototipo: aquí se abre el selector de archivo (PNG o SVG, máx. 1 MB).">Subir logo</button></div></div>'+
+    '<div class="fld"><span id="ocol-l">Color</span>'+swatches('ocol')+'</div>'+
+    '<div class="row"><button type="button" class="btn sec" data-st="dueno">Atrás</button><button type="button" class="btn" style="flex:1" id="os-go" data-st="llave">Continuar</button></div>';
+  }else if(s==='llave'||s==='error'||s==='verificando'){var busy=s==='verificando';
+    o+=osSteps(3)+'<h1 style="font-size:28px">Conecta tu cuenta pey</h1><p class="mut">Pégalas tú: tu agente no debe ver ni guardar esta llave.</p>'+
+    (s==='error'?'<div class="alert err" role="alert">'+ic('alert')+'<div><b>pey no aceptó la llave.</b> Revisa que la copiaste completa y que el ID de cuenta sea de esa misma cuenta pey. No se guardó nada.</div></div>':'')+
+    '<label class="fld" for="os-key">Llave de API de pey<input class="inp" id="os-key" type="password" autocomplete="off" spellcheck="false" value="ejemplo-de-llave"'+(s==='error'?' aria-invalid="true"':'')+(busy?' readonly':'')+'><span class="hint">Se guarda cifrada en esta instalación y no se vuelve a mostrar. Solo se puede reemplazar.</span></label>'+
+    '<label class="fld" for="os-acc">ID de cuenta bancaria<input class="inp" id="os-acc" autocomplete="off" value="cta_ejemplo_01"'+(busy?' readonly':'')+'><span class="hint">La cuenta donde vas a recibir. Está en tu cuenta pey, junto a tu CLABE.</span></label>'+
+    (busy?'<div class="row" role="status"><div class="spin" aria-hidden="true"></div><span>Consultando a pey…</span></div>':'<div class="row"><button type="button" class="btn sec" data-st="negocio">Atrás</button><button type="button" class="btn" style="flex:1" id="os-ver" data-act="os-key">Verificar conexión</button></div><button type="button" class="btn ghost block" data-st="demo">Todavía no la tengo: seguir en DEMO</button>')+foot;
+  }else if(s==='listo'){
+    o+=osSteps(4)+mb('ok','check','Conexión verificada con pey')+'<h1 style="font-size:28px">Listo para cobrar</h1>'+
+    '<dl class="kv card"><dt>Dueño</dt><dd>Ana López</dd><dt>Negocio</dt><dd>'+h(S.biz.name)+'</dd><dt>Llave de API</dt><dd>Guardada · no se puede ver</dd><dt>Cuenta destino</dt><dd class="num">CLABE •••• 4417</dd><dt>Edición</dt><dd>PAYVRO OS · un negocio</dd></dl>'+
+    '<button type="button" class="btn block" id="os-first" data-act="os-start" data-v="0">Crear mi primer cobro</button>'+foot;
+  }else{
+    o+=osSteps(3)+'<span class="tag demo">DEMO</span><h1 style="font-size:28px">Sigue en DEMO sin conectar nada</h1><p class="mut">Creas cobros, ves la página de tu cliente y simulas el pago para ver cómo se verifica y se libera. No se mueve dinero real y todo queda marcado como DEMO.</p>'+
+    '<div class="alert info">'+ic('key')+'<div>Cuando tengas tu llave de pey, la pegas en Ajustes y los cobros pasan a ser reales. Los de DEMO no se mezclan con los reales.</div></div>'+
+    '<button type="button" class="btn block" id="os-first" data-act="os-start" data-v="1">Crear un cobro de prueba</button><button type="button" class="btn ghost block" data-st="llave">Conectar mi cuenta pey ahora</button>'+foot;
+  }
+  return top+o+'</div>';
+}
+
+/* ---------- dialogos ---------- */
+var DLG={
+  'up-whatsapp':['Envía el cobro por WhatsApp desde aquí','Con Pro mandas el link al chat de tu cliente sin salir de PAYVRO. En Gratis puedes seguir copiando el link: tus cobros no cambian.','pro'],
+  'up-usuarios':['Invita a tu equipo','Tu plan Gratis incluye 1 usuario. Con Pro agregas Administradores y Cajeros, cada quien con su correo, y lo que hacen queda en bitácora.','pro'],
+  'up-plantilla':['Usa todas las plantillas','Tu plan Gratis incluye 1 plantilla a la vez. Con Pro usas todas al mismo tiempo y los recordatorios de Membresía salen por WhatsApp.','pro'],
+  'up-business':['API, MCP y webhooks','Con Business tu tienda o tu agente crean cobros y reciben avisos firmados. También incluye sucursales, roles por sucursal y permisos finos.','business'],
+  'cerrar':['¿Dejar de esperar este cobro?','El cobro pasa a «Cerrado sin liberar» con el motivo «El dueño dejó de esperarlo». pey no permite anular el cobro. Si alguien paga después, el pago entra a En revisión · pago tardío.','danger','Sí, dejar de esperarlo'],
+  'bajar':['¿Bajar al plan Gratis?','Conservas tus cobros y tu historial. Al terminar el periodo pagado se desactivan WhatsApp y los usuarios adicionales, y eliges qué plantilla conservas.','danger','Bajar a Gratis'],
+  'baja-membresia':['¿Dar de baja esta membresía?','Dejamos de enviarle links de pago a Pedro Ejemplo. Su historial se conserva. Puedes crearle una membresía nueva después.','danger','Sí, dar de baja'],
+  'llave':['Llave de pey','Pega la llave nueva. La anterior deja de usarse al instante y esta no se vuelve a mostrar. Por seguridad te pediremos iniciar sesión otra vez.','key','Verificar y guardar'],
+  'nueva-llave':['Llave creada','Cópiala ahora. Es la única vez que la mostramos; si la pierdes, crea otra y revoca esta.','newkey','Ya la copié'],
+  'revocar':['¿Revocar esta llave?','Lo que use esta llave dejará de poder crear cobros de inmediato. No se puede deshacer.','danger','Sí, revocar llave'],
+  'no-liberar':['No liberar este cobro','El cobro pasa a «Cerrado sin liberar», con el motivo y tu nombre en bitácora. PAYVRO no hace devoluciones: si devuelves el dinero, lo haces desde tu banco y aquí lo anotas.','reject','Cerrar sin liberar'],
+  'cambiar-plantilla':['Cambiar tu plantilla gratis','','swap',''],
+  'os-wa':['Conecta tu número de WhatsApp','En PAYVRO OS el envío por WhatsApp usa tu propio número. Conéctalo una vez en Ajustes y después envías desde aquí. Mientras tanto puedes copiar el link.','goto','Ir a conectar WhatsApp']
+};
+function vDialog(){
+  if(!S.dialog)return '';
+  var d=DLG[S.dialog],k=d[2],body='',ok='',title=d[0],text=d[1];
+  if(k==='pro'||k==='business'){ok='<button type="button" class="btn" id="dlg-ok" data-act="dlg-plan" data-p="'+k+'">Cambiar a '+(k==='pro'?'Pro':'Business')+'</button><button type="button" class="btn ghost" id="dlg-no" data-act="dlg-close">Ahora no</button>';body='<p class="small mut">Cuota fija mensual · precio por definir. Sin comisión por pago.</p>';}
+  else if(k==='danger'){ok='<button type="button" class="btn danger" id="dlg-ok" data-act="dlg-done" data-msg="Hecho. Quedó registrado en la bitácora.">'+d[3]+'</button><button type="button" class="btn sec" id="dlg-no" data-act="dlg-close">Volver</button>';}
+  else if(k==='key'){body='<label class="fld" for="dlg-key">Llave nueva de pey<input class="inp" id="dlg-key" type="password" autocomplete="off" spellcheck="false"></label>';ok='<button type="button" class="btn" id="dlg-ok" data-act="dlg-done" data-msg="Llave verificada con pey y guardada.">'+d[3]+'</button><button type="button" class="btn sec" id="dlg-no" data-act="dlg-close">Cancelar</button>';}
+  else if(k==='reject'){body='<label class="chk" for="dlg-ref"><input type="checkbox" id="dlg-ref"><span><b>Anotar «devolución hecha por fuera»</b><br><span class="small mut">Márcalo cuando ya devolviste el dinero desde tu banco. Lo puedes anotar después.</span></span></label><label class="fld" for="dlg-note">Nota para la bitácora <span class="hint">(opcional)</span><input class="inp" id="dlg-note" maxlength="120" placeholder="Ej. devolví $800.00 por transferencia el 14 nov"></label>';ok='<button type="button" class="btn danger" id="dlg-ok" data-act="rev-reject">'+d[3]+'</button><button type="button" class="btn sec" id="dlg-no" data-act="dlg-close">Volver</button>';}
+  else if(k==='swap'){var nt=tplBy(S.pendTpl||'mostrador');title='¿Usar '+nt[1]+' como tu plantilla?';text='Tu plan Gratis usa 1 plantilla a la vez. Ahora es '+tplBy(S.tplFree)[1]+'. Los cobros que ya creaste siguen su curso; los nuevos se crean con '+nt[1]+'.';ok='<button type="button" class="btn" id="dlg-ok" data-act="swap-do">Usar '+nt[1]+'</button><button type="button" class="btn sec" id="dlg-pro" data-act="dlg-plan" data-p="pro">Usar todas con Pro</button><button type="button" class="btn ghost" id="dlg-no" data-act="dlg-close">Ahora no</button>';}
+  else if(k==='goto'){ok='<button type="button" class="btn" id="dlg-ok" data-go="ajustes" data-st="conexiones">'+d[3]+'</button><button type="button" class="btn ghost" id="dlg-no" data-act="dlg-close">Ahora no</button>';}
+  else{body='<div class="row" style="flex-wrap:nowrap"><input class="inp num" id="dlg-nk" readonly aria-label="Llave nueva" value="pv_live_ejemplo_no_real_7f3a"><button type="button" class="btn sec" id="dlg-cp" data-act="copy" data-v="pv_live_ejemplo_no_real_7f3a">'+ic('copy')+'Copiar</button></div>';ok='<button type="button" class="btn" id="dlg-ok" data-act="dlg-close">'+d[3]+'</button>';}
+  return '<div class="overlay" data-act="dlg-bg"><div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlg-t" aria-describedby="dlg-p">'+(k==='pro'?'<span class="tag pro" style="align-self:flex-start">Pro</span>':(k==='business'?'<span class="tag" style="align-self:flex-start">Business</span>':''))+'<h2 id="dlg-t" style="font-size:22px">'+title+'</h2><p id="dlg-p" class="mut">'+text+'</p>'+body+'<div class="row" style="margin-top:4px">'+ok+'</div></div></div>';
+}
+
+/* ---------- rutas ---------- */
+var R={
+  indice:{t:'Índice de pantallas',who:'',states:[['todo','Todo']],v:vIndice,notes:[]},
+  landing:{t:'Landing (Cloud)',who:'Visitante · público',states:[['completa','Completa']],v:vLanding,notes:[['Un solo llamado','«Crea tu cuenta gratis» se repite en el encabezado, el hero, el plan Gratis y el cierre. Siempre lleva al registro.'],['Sin precios todavía','Los planes de pago dicen «precio por definir». El mensaje fijo es cuota mensual, nunca por pago.'],['pey sin avales','Se describe qué hace la API. No hay logotipo de pey ni frases de alianza o certificación.']]},
+  acceso:{t:'Registro e ingreso',who:'Dueño · estilo Clerk',states:[['registro','Registro'],['codigo','Registro · código'],['codigo-error','Código incorrecto'],['error','Correo ya registrado'],['ingreso','Ingreso'],['ingreso-error','Contraseña incorrecta']],v:vAcceso,notes:[['Igual que la slide 6','Correo, contraseña, «Continuar» y «Continuar con Google». Sigue siendo un solo paso.'],['Código en la misma pantalla','Con correo, el código de un solo uso aparece ahí mismo, debajo de la contraseña. Con Google se entra directo.'],['Errores con salida','Cada error dice qué pasó y ofrece el siguiente paso en el mismo mensaje.']]},
+  onboarding:{t:'Onboarding',who:'Dueño · primera vez',states:[['giro','Giro'],['perfil','Tu negocio'],['pey-llave','Ya tengo cuenta pey'],['pey-verificando','Verificando llave'],['pey-error','Llave rechazada'],['pey-ok','Conexión verificada'],['pey-alta','Ayúdame a abrir mi cuenta'],['alta-error','CLABE incompleta'],['validacion','En validación']],v:vOnb,notes:[['Cuenta, giro, negocio, cobro','El camino principal son esos pasos, como en la slide 6. Conectar pey es un desvío opcional dentro de «Tu negocio».'],['La llave no se vuelve a ver','Campo tipo contraseña. Después solo dice «Guardada · no se puede ver» y se puede reemplazar.'],['La espera no detiene','«En validación · 5–7 días hábiles» siempre va junto al botón para cobrar en DEMO.']]},
+  panel:{t:'Panel del dueño',who:'Dueño · todos los días',states:[['hoy','Con cobros'],['vacio','Primera vez'],['cargando','Cargando'],['sin-resultados','Sin resultados'],['error','Sin conexión']],v:vPanel,notes:[['Estado con texto e icono','Cada estado lleva etiqueta, icono y color. El ámbar solo significa «Esperando pago».'],['«Cobrado hoy» solo cuenta lo verificado','El total suma cobros verificados o liberados. Lo que espera pago va aparte.'],['Revisión arriba de todo','Si hay cobros en revisión, el aviso va antes de los totales con acceso directo.']]},
+  'nuevo-cobro':{t:'Nuevo cobro',who:'Dueño · por plantilla',states:[['formulario','Formulario'],['error','Monto inválido'],['creando','Creando'],['error-pey','pey no respondió'],['listo','Link y QR listos']],v:vNuevo,notes:[['Tres campos','Monto, concepto y celular opcional. Cada plantilla agrega solo lo suyo y su vigencia por defecto.'],['Mismos tres botones que la slide 6','«Copiar link», «Mostrar QR» y «Enviar por WhatsApp» con insignia Pro.'],['Si pey falla, no se pierde nada','El error dice que no se creó ningún link y conserva lo escrito.']]},
+  detalle:{t:'Detalle del cobro',who:'Dueño',states:[['esperando','Esperando pago'],['verificado','Pago verificado'],['liberado','Liberado'],['revision','En revisión'],['expirado','Expirado'],['cerrado','Cerrado sin liberar'],['cargando','Cargando'],['no-encontrado','No encontrado']],v:vDetalle,notes:[['Predecible','Folio siempre visible, línea de tiempo en lenguaje llano y bitácora técnica debajo.'],['El webhook solo avisa','En bitácora se ve el aviso de pey y después la consulta autenticada, que es la que decide.'],['Sin «cancelar»','pey no anula cobros. «Dejar de esperar» pasa el cobro a «Cerrado sin liberar»; un pago posterior entra a En revisión · pago tardío.']]},
+  pago:{t:'Página de pago del cliente',who:'Cliente · pública, móvil primero',states:[['esperando','Esperando pago'],['push','Solicitud enviada'],['push-error','Número sin CoDi'],['verificando','Verificando'],['exito','Pago verificado'],['expirado','Expirado'],['revision','En revisión'],['cerrado','Cerrado sin liberar'],['cargando','Cargando'],['sin-conexion','Sin conexión'],['no-encontrado','Link inválido']],v:vPago,dev:'mobile',notes:[['Como la slide 6, más el celular','Monto, pedido, QR, «Paga con la app de tu banco (CoDi)» y «Esperando pago». Debajo, la solicitud al celular para quien abre el link en su teléfono.'],['Nunca «pagado» antes de tiempo','Entre el pago y la confirmación está «Verificando con pey…». El éxito solo aparece con la confirmación de pey.'],['Marca del negocio','Encabezado con nombre y color del negocio. «Cobro creado con PAYVRO» sale solo en el plan Gratis.']]},
+  revision:{t:'Flujo «En revisión»',who:'Dueño o administrador',states:[['monto','Monto distinto'],['cuenta','Cuenta distinta'],['duplicado','Pago duplicado'],['tardio','Pago tardío']],v:vRevision,notes:[['Tres salidas, siempre las mismas','Liberar con lo recibido, pedir la diferencia y no liberar. La que no aplica se ve, desactivada, con su motivo.'],['PAYVRO no devuelve dinero','«No liberar» permite anotar «devolución hecha por fuera». La devolución se hace desde el banco del negocio.'],['Nunca se libera solo','Un cobro en revisión solo sale por una decisión con nombre y hora en bitácora.']]},
+  plantillas:{t:'Plantillas',who:'Dueño',states:[['galeria','Galería'],['reglas','Reglas de plantilla'],['membresia','Membresías'],['membresia-vacia','Membresías · vacío']],v:vPlantillas,notes:[['Gratis elige la suya','En Gratis hay una plantilla activa y las demás ofrecen «Usar esta en su lugar», incluido Mostrador.'],['Vigencia por plantilla','Cada una trae su valor por defecto y se puede cambiar. Están marcadas «Por validar».'],['Membresía con ritmo claro','Día 0 link de pago y aviso rápido por CoDi; días 1 y 3 recordatorio; día 5 último aviso; día 7 pausada. Si paga se reactiva sola. En Gratis los avisos van por correo, con «Reenviar cobro». En Pro salen por WhatsApp, con correo de respaldo.']]},
+  plan:{t:'Plan y facturación',who:'Dueño',states:[['planes','Planes'],['facturacion','Facturación'],['pago-fallido','Suscripción sin cobrar']],v:vPlan,notes:[['Cuota fija repetida','«Nunca por pago» aparece en la página, en cada diálogo de mejora y en facturación.'],['Mejora en contexto','Los diálogos solo salen al tocar algo que el plan no incluye y siempre tienen «Ahora no».'],['Si falla la suscripción, se sigue cobrando','El aviso aclara que los cobros CoDi no se detienen.']]},
+  ajustes:{t:'Ajustes',who:'Dueño',states:[['negocio','Negocio'],['equipo','Equipo y roles'],['pey','Conexión pey'],['pey-error','Conexión con error'],['api','API y webhooks'],['api-vacio','API · vacío'],['conexiones','WhatsApp y agente (OS)'],['bitacora','Bitácora de seguridad'],['bitacora-vacia','Bitácora · vacía']],v:vAjustes,notes:[['Roles por plan','Pro: Dueño, Administrador y Cajero, más el Agente como función. Business: sucursales, roles por sucursal y permisos finos.'],['Cuenta destino protegida','Solo el dueño la cambia, con nueva sesión. El agente nunca.'],['Llaves de un solo vistazo','La llave de pey no se muestra nunca; las llaves de PAYVRO, una sola vez al crearlas.']]},
+  mostrador:{t:'Modo Mostrador',who:'Cajero · tablet o teléfono en caja',states:[['teclado','Teclado'],['qr','QR · esperando pago'],['recibido','Recibiste $X'],['revisa','Revisa este pago'],['vencido','QR vencido'],['sin-conexion','Sin conexión'],['etiquetas','Etiquetas QR'],['etiquetas-vacio','Etiquetas · vacío']],v:vMostrador,dev:'tablet',notes:[['Para verse de lejos','Monto y estado en tamaño grande. Botones de 68 px para dedo.'],['Dos avisos distintos','«Recibiste $X» solo con pago verificado y monto correcto. Un monto distinto suena «Revisa este pago». Los dos van con texto en pantalla.'],['Vigencias','Etiquetas fijas sin vencimiento; monto libre, 15 minutos.']]},
+  os:{t:'PAYVRO OS · Instalado por tu agente',who:'Dueño · primer arranque de una instalación propia',states:[['inicio','Instalación lista'],['dueno','Usuario dueño'],['negocio','Tu negocio'],['llave','Conectar pey'],['verificando','Verificando'],['error','Llave rechazada'],['listo','Conexión verificada'],['demo','Probar en DEMO']],v:vOS,notes:[['Solo lo que el agente no puede hacer','El agente instala. La persona crea al usuario dueño, el perfil del negocio y pega la llave.'],['DEMO desde el primer minuto','Se puede probar todo sin llave. Los cobros de DEMO no se mezclan con los reales.'],['Después, las mismas pantallas','Las del dueño son las de Cloud con todo lo de Business. No hay Plan, facturación ni alta de cuenta pey. WhatsApp y el agente se conectan con cuenta propia en Ajustes.']]}
+};
+var ORDER=['indice','landing','acceso','onboarding','panel','nuevo-cobro','detalle','pago','revision','plantillas','plan','ajustes','mostrador','os'];
+
+/* ---------- render ---------- */
+var work,idx,idxsel,lastRoute=null,toastT=null,timer=null;
+function render(){
+  var r=R[S.route],act=document.activeElement,fid=act&&act.id,n=ORDER.indexOf(S.route),o='';
+  o+='<div class="whead"><h1 id="scr-title" tabindex="-1">'+(n?(n<10?'0':'')+n+' · ':'')+r.t+'</h1><span class="who">'+r.who+'</span></div>';
+  if(r.states.length>1){o+='<div class="states" role="group" aria-label="Estados de esta pantalla"><span class="lab">Estados</span>';
+    r.states.forEach(function(s){o+='<button type="button" id="st-'+s[0]+'" aria-pressed="'+(sub()===s[0])+'" data-st="'+s[0]+'">'+s[1]+'</button>';});o+='</div>';}
+  o+='<div class="frame" data-dev="'+(S.route==='indice'?'desktop':S.device)+'"><div class="stage" id="stage">'+r.v()+vDialog()+(S.toast?'<div class="toast" role="status">'+h(S.toast)+'</div>':'')+'</div></div>';
+  if(r.notes.length){o+='<section class="notes" aria-label="Lógica de UX">';r.notes.forEach(function(x){o+='<div><b>'+x[0]+'</b>'+x[1]+'</div>';});o+='</section>';}
+  work.innerHTML=o;
+  var nav='<h2>Pantallas</h2>',opts='';
+  ORDER.forEach(function(k,i){nav+='<a href="#'+k+'"'+(k===S.route?' aria-current="page"':'')+'><span class="n">'+(i?(i<10?'0':'')+i:'')+'</span>'+R[k].t+'</a>';opts+='<option value="'+k+'"'+(k===S.route?' selected':'')+'>'+(i?i+'. ':'')+R[k].t+'</option>';});
+  idx.innerHTML=nav;idxsel.innerHTML=opts;
+  [['edseg','ed',S.os?'os':'cloud'],['devseg','dev',S.device],['planseg','plan',S.plan],['demoseg','demo',S.demo?'1':'0']].forEach(function(g){
+    [].forEach.call(document.getElementById(g[0]).querySelectorAll('button'),function(b){b.setAttribute('aria-pressed',String(b.getAttribute('data-'+g[1])===g[2]));});});
+  if(S.dialog){var dk=document.getElementById('dlg-ok');if(dk)dk.focus();}
+  else if(S.route==='acceso'&&sub()==='codigo'&&fid==='ac-go'){var cf=document.getElementById('ac-code');if(cf)cf.focus();}
+  else if(lastRoute!==S.route){if(lastRoute!==null){document.getElementById('scr-title').focus();work.scrollTop=0;}}
+  else if(fid){var el=document.getElementById(fid);if(el)el.focus();}
+  lastRoute=S.route;
+}
+function narrow(){return !!(window.matchMedia&&window.matchMedia('(max-width:900px)').matches);}
+function go(route,st){
+  if(!R[route])route='indice';
+  if(route!==S.route&&R[route].dev)S.device=R[route].dev;
+  else if(route!==S.route&&(S.route==='pago'||S.route==='mostrador'))S.device=narrow()?'mobile':'desktop';
+  if(route!==S.route){S.revDone=null;S.revClosed=false;}
+  S.route=route;if(st)S.sub[route]=st;S.dialog=null;
+  if(location.hash!=='#'+route){try{location.hash=route;}catch(e){}}
+  render();
+}
+function toast(m){S.toast=m;render();clearTimeout(toastT);toastT=setTimeout(function(){S.toast=null;var e=document.querySelector('.toast');if(e)e.remove();},3600);}
+function later(ms,fn){clearTimeout(timer);timer=setTimeout(fn,ms);}
+function speak(kind){var t=kind==='rev'?'Revisa este pago':'Recibiste '+padAmt().toFixed(2).replace('.00','')+' pesos';
+  try{var u=new SpeechSynthesisUtterance(t);u.lang='es-MX';window.speechSynthesis.cancel();window.speechSynthesis.speak(u);}catch(e){}}
+function resetData(){var c=ch('#128');c.st='liberado';c.at='09:47';ch('#131').st='esperando';S.first=false;}
+
+var ACT={
+  toast:function(el){toast(el.getAttribute('data-msg'));},
+  tour:function(){resetData();S.os=false;S.plan='gratis';go('acceso','registro');},
+  reset:function(){resetData();S.os=false;S.connect=null;S.sub={};go('acceso','registro');},
+  'start-onb':function(){S.first=true;S.demo=true;S.connect=null;go('onboarding','giro');},
+  giro:function(el){S.biz.giro=el.getAttribute('data-v');var t=tplBy(el.getAttribute('data-t'));if(t[3]==='base')S.tplFree=t[0];render();},
+  color:function(el){S.biz.color=el.getAttribute('data-v');render();},
+  pick:function(el){var p=el.parentNode;[].forEach.call(p.querySelectorAll('[data-act=pick]'),function(b){b.setAttribute('aria-pressed',String(b===el));});},
+  'finish-onb':function(){S.tpl=S.tplFree;if(S.tpl==='mostrador')go('mostrador','teclado');else go('nuevo-cobro','formulario');},
+  'connect-key':function(){S.sub.onboarding='pey-verificando';render();later(900,function(){S.demo=false;S.connect='key';if(S.route==='onboarding'){S.sub.onboarding='pey-ok';render();}});},
+  'connect-alta':function(){var v=(document.getElementById('al-clabe')||{}).value||'';if(v.replace(/\D/g,'').length!==18){S.sub.onboarding='alta-error';render();var f=document.getElementById('al-clabe');if(f)f.focus();return;}S.demo=true;S.connect='alta';S.sub.onboarding='validacion';render();},
+  filter:function(el){S.filter=el.getAttribute('data-v');if(el.getAttribute('data-st'))S.sub.panel='hoy';render();},
+  open:function(el){var c=ch(el.getAttribute('data-id'));S.sel=c.id;go('detalle',c.st);},
+  tpl:function(el){var v=el.getAttribute('data-v'),l=lockOf(tplBy(v));if(l==='swap'){S.pendTpl=v;S.dialog='cambiar-plantilla';}else if(l){S.dialog=l==='pro'?'up-plantilla':'up-business';}else{S.tpl=v;S.sub['nuevo-cobro']='formulario';}render();},
+  'tpl-go':function(el){S.tpl=el.getAttribute('data-v');if(S.tpl==='mostrador')go('mostrador','teclado');else go('nuevo-cobro','formulario');},
+  'swap-ask':function(el){S.pendTpl=el.getAttribute('data-v');S.dialog='cambiar-plantilla';render();},
+  'swap-do':function(){S.tplFree=S.pendTpl;S.tpl=S.pendTpl;S.dialog=null;toast('Listo: tu plantilla gratis ahora es '+tplBy(S.tplFree)[1]+'.');},
+  rules:function(el){S.ruleTpl=el.getAttribute('data-v');go('plantillas','reglas');},
+  create:function(){
+    var a=document.getElementById('nc-amt'),v=parseFloat(String(a?a.value:'').replace(/[^0-9.]/g,''));
+    if(!(v>0)){S.sub['nuevo-cobro']='error';render();var f=document.getElementById('nc-amt');if(f)f.focus();return;}
+    var con=(document.getElementById('nc-con')||{}).value||'Sin concepto',tel=(document.getElementById('nc-tel')||{}).value||'';
+    S.sub['nuevo-cobro']='creando';render();
+    later(700,function(){
+      var c;
+      if(S.first&&S.tpl==='pedido'){c=ch('#128');c.amt=v;c.con=con;c.st='esperando';c.at='11:24';c.tel=tel;}
+      else{c={id:'#'+(127+S.charges.length),k:S.tpl,tpl:{pedido:'Pedido',cita:'Anticipo de cita',cotizacion:'Cotización',membresia:'Membresía'}[S.tpl],con:con,amt:v,st:'esperando',at:'11:24',tel:tel};S.charges.unshift(c);}
+      S.sel=c.id;if(S.route==='nuevo-cobro'){S.sub['nuevo-cobro']='listo';render();}
+    });
+  },
+  copy:function(el){var v=el.getAttribute('data-v');try{navigator.clipboard.writeText(v).then(function(){},function(){});}catch(e){}toast('Copiado: '+v);},
+  whatsapp:function(){if(S.os&&!S.osWa){S.dialog='os-wa';render();return;}if(S.plan==='gratis'){S.dialog='up-whatsapp';render();}else toast('Link enviado por WhatsApp.');},
+  dialog:function(el){S.dialog=el.getAttribute('data-d');render();},
+  'dlg-close':function(){S.dialog=null;render();},
+  'dlg-bg':function(el,ev){if(ev.target===el){S.dialog=null;render();}},
+  'dlg-done':function(el){var was=S.dialog;S.dialog=null;
+    if(was==='cerrar'&&S.route==='mostrador'){S.sub.mostrador='teclado';toast('Cobro cerrado sin liberar. Si alguien paga ese QR, entra a En revisión · pago tardío.');return;}
+    if(was==='cerrar'&&S.route==='detalle'){var c=ch(S.sel);c.st='cerrado';c.reason='El dueño dejó de esperarlo';c.by='Ana López (dueña)';c.got=null;c.ref=false;c.closedAt='Hoy 11:30';S.sub.detalle='cerrado';toast('Cobro cerrado sin liberar. Quedó en la bitácora.');return;}
+    toast(el.getAttribute('data-msg'));},
+  'dlg-plan':function(el){S.plan=el.getAttribute('data-p');S.dialog=null;toast('Listo, ahora estás en '+PLAN_N[S.plan]+'. (Prototipo: aquí va el pago de la suscripción.)');},
+  setplan:function(el){S.plan=el.getAttribute('data-p');toast('Plan cambiado a '+PLAN_N[S.plan]+'. (Prototipo: aquí va el pago de la suscripción.)');},
+  release:function(){var c=ch(S.sel);c.st='liberado';S.sub.detalle='liberado';toast('Liberado. Avisamos a tu cliente.');},
+  rev:function(el){var v=el.getAttribute('data-v'),c=ch(sub()==='tardio'?'#127':'#129');
+    if(v==='reject'){S.dialog='no-liberar';render();return;}
+    S.revDone=v==='diff'?'Creamos un cobro nuevo por '+money(c.amt-(c.got||0))+'. Este se libera cuando el nuevo quede verificado.':'Liberado con lo recibido.';render();},
+  'rev-reject':function(){var r=document.getElementById('dlg-ref');S.revClosed=true;S.revDone='El cobro pasó a «Cerrado sin liberar».'+(r&&r.checked?' Anotaste «devolución hecha por fuera».':' Sin devolución anotada; la puedes anotar después.');S.dialog=null;render();},
+  'rev-reset':function(){S.revDone=null;S.revClosed=false;render();},
+  simpay:function(){S.sub.pago='verificando';render();later(1100,function(){var c=ch(S.sel);if(c.st!=='esperando'){c=ch('#131');S.sel=c.id;}c.st=c.k==='cotizacion'?'verificado':'liberado';S.first=false;if(S.route==='pago'){S.sub.pago='exito';render();}});},
+  pad:function(el){var k=el.getAttribute('data-v');if(k==='del')S.pad=S.pad.slice(0,-1);else if((S.pad+k).length<=8)S.pad=(S.pad+k).replace(/^0+/,'');render();},
+  'pad-go':function(){if(padAmt()>0){S.sub.mostrador='qr';render();}},
+  'pad-pay':function(){S.sub.mostrador='recibido';render();speak('ok');},
+  'pad-new':function(){S.pad='';S.sub.mostrador='teclado';render();},
+  speak:function(el){speak(el.getAttribute('data-v'));},
+  'os-wa':function(){S.osWa=!S.osWa;toast(S.osWa?'WhatsApp conectado con tu número. (Prototipo: aquí va el alta del número.)':'WhatsApp desconectado.');},
+  'os-model':function(){S.osModel=!S.osModel;toast(S.osModel?'Modelo conectado. (Prototipo: aquí pegas la llave de tu modelo.)':'Modelo desconectado.');},
+  'set-os':function(){S.os=true;S.plan='business';render();},
+  'os-key':function(){S.sub.os='verificando';render();later(900,function(){S.demo=false;S.connect='key';if(S.route==='os'){S.sub.os='listo';render();}});},
+  'os-start':function(el){S.os=true;S.plan='business';S.demo=el.getAttribute('data-v')==='1';S.first=true;S.tpl='pedido';go('nuevo-cobro','formulario');}
+};
+
+function init(){
+  work=document.getElementById('work');idx=document.getElementById('idx');idxsel=document.getElementById('idxsel');
+  document.addEventListener('click',function(ev){
+    var t=ev.target.closest('[data-scroll]');
+    if(t){ev.preventDefault();var sec=document.getElementById('sec-'+t.getAttribute('data-scroll'));if(sec)sec.scrollIntoView({block:'start'});return;}
+    t=ev.target.closest('[data-dev],[data-plan],[data-demo],[data-ed]');
+    if(t&&t.closest('#top')){if(t.hasAttribute('data-ed')){S.os=t.getAttribute('data-ed')==='os';if(S.os)S.plan='business';}if(t.hasAttribute('data-plan'))S.os=false;if(t.hasAttribute('data-dev'))S.device=t.getAttribute('data-dev');if(t.hasAttribute('data-plan'))S.plan=t.getAttribute('data-plan');if(t.hasAttribute('data-demo'))S.demo=t.getAttribute('data-demo')==='1';render();return;}
+    t=ev.target.closest('[data-act],[data-go],[data-st]');
+    if(!t||t.getAttribute('aria-disabled')==='true')return;
+    if(t.hasAttribute('data-act')){ACT[t.getAttribute('data-act')](t,ev);return;}
+    if(t.hasAttribute('data-go')){go(t.getAttribute('data-go'),t.getAttribute('data-st'));return;}
+    if(t.hasAttribute('data-st')){clearTimeout(timer);S.sub[S.route]=t.getAttribute('data-st');S.dialog=null;S.revDone=null;render();}
+  });
+  document.addEventListener('change',function(ev){var b=ev.target.getAttribute&&ev.target.getAttribute('data-bind');if(b==='name'){S.biz.name=ev.target.value.trim()||'Tu negocio';render();}});
+  document.addEventListener('keydown',function(ev){
+    if(ev.key==='Escape'&&S.dialog){S.dialog=null;render();return;}
+    if(ev.key==='Tab'&&S.dialog){var f=document.querySelectorAll('.dlg button,.dlg input');if(!f.length)return;var a=f[0],z=f[f.length-1];if(ev.shiftKey&&document.activeElement===a){ev.preventDefault();z.focus();}else if(!ev.shiftKey&&document.activeElement===z){ev.preventDefault();a.focus();}return;}
+    if(ev.key==='Enter'&&ev.target.id==='nc-amt'){ACT.create();return;}
+    var role=ev.target.getAttribute&&ev.target.getAttribute('role');
+    if((role==='tab'||role==='radio')&&/^Arrow/.test(ev.key)){
+      var grp=[].slice.call(ev.target.parentNode.querySelectorAll('[role='+role+']')),i=grp.indexOf(ev.target),d=(ev.key==='ArrowRight'||ev.key==='ArrowDown')?1:-1,nx=grp[(i+d+grp.length)%grp.length];
+      ev.preventDefault();var id=nx.id;nx.click();var e2=document.getElementById(id);if(e2)e2.focus();
+    }
+  });
+  idxsel.addEventListener('change',function(){go(idxsel.value);});
+  window.addEventListener('hashchange',function(){var k=(location.hash||'').slice(1);if(k&&k!==S.route&&R[k])go(k);});
+  var k=(location.hash||'').slice(1);
+  if(k&&R[k]){S.route=k;if(R[k].dev)S.device=R[k].dev;}
+  if(narrow()&&S.device==='desktop')S.device='mobile';
+  render();
+}
+if(typeof document!=='undefined')init();
+if(typeof module!=='undefined')module.exports={S:S,R:R,ORDER:ORDER,vDialog:vDialog,DLG:DLG};
+})();
+</script>
+</body>
+</html>
