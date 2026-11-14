@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+:root {
+  --ink: #142b3b;
+  --paper: #f5f3ec;
+  --petroleo: #076b76;
+  --teal: #00b8b2;
+  --magenta: #ef006d;
+  --yellow: #ffc400;
+  --orange: #ff7900;
+  --line: #d9d5c8;
+  --muted: #4a5e6b;
+  --background: var(--paper);
+  --foreground: var(--ink);
+}
+
+@theme inline {
+  --color-ink: var(--ink);
+  --color-paper: var(--paper);
+  --color-petroleo: var(--petroleo);
+  --color-teal: var(--teal);
+  --color-magenta: var(--magenta);
+  --color-yellow: var(--yellow);
+  --color-orange: var(--orange);
+  --color-line: var(--line);
+  --color-muted: var(--muted);
+  --font-sans: var(--font-noto-sans);
+  --font-display: var(--font-noto-sans-display);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: var(--background);
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-noto-sans), sans-serif;
+  text-rendering: optimizeLegibility;
+}
+
+:focus-visible {
+  outline: 3px solid var(--petroleo);
+  outline-offset: 3px;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--teal) 24%, transparent);
+}
