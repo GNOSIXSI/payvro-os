@@ -3,7 +3,7 @@
 Read this before writing code, a test or a doc. If a word here and a word in the code disagree, the code is wrong.
 Domain words stay in Spanish everywhere (identifiers, tables, states, UI). Prose for agents is English.
 
-Each statement about pey is tagged: **[FACT]** (in the OpenAPI snapshot of 2026-11-14, `info.version` 2026-10-20), **[NOTE]** (said by pey in person on 2026-11-07 or read in earlier notes, not in the snapshot) or **[OPEN]** (unknown; do not build on a guess).
+Each statement about pey is tagged: **[FACT]** (in the OpenAPI snapshot of 2026-11-14, `info.version` 2026-10-20), **[NOTE]** (per pey, 2026-11-07, or earlier notes; not in the snapshot) or **[OPEN]** (unknown; do not build on a guess).
 
 ## 1. Product in one paragraph
 

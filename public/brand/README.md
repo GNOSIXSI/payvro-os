@@ -16,4 +16,4 @@ Tipografías: Noto Sans Display (títulos) y Noto Sans (texto).
 
 ## Licencia de la marca
 
-El código de este repositorio es MIT. El nombre PAYVRO y estos logos identifican al proyecto de GNOSIX y **no** forman parte de esa licencia: si publicas una versión modificada, usa tu propio nombre y logo.
+El código de este repositorio se publica bajo FSL-1.1-ALv2 (código disponible); ver LICENSE, NOTICE y TRADEMARKS.md. El nombre PAYVRO y estos logos identifican al proyecto de GNOSIX y **no** forman parte de esa licencia: si publicas una versión modificada, usa tu propio nombre y logo.

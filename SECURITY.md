@@ -71,7 +71,7 @@ Inside an install:
 6. Answer 200 as soon as the evento is stored. 200 means "received", not "paid".
 7. Schedule a verification that reads pey. The event's own amount and status are discarded.
 
-pey sends each event once and does not retry (told in person, 2026-11-07). A lost event is therefore normal; the sweep recovers it.
+pey sends each event once and does not retry (per pey, 2026-11-07). A lost event is therefore normal; the sweep recovers it.
 
 ## 7. Agents
 
