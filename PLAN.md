@@ -98,13 +98,10 @@ Facts we do not have yet. Each names who can answer and what it blocks.
 
 | # | Question | Who | Blocks |
 |---|---|---|---|
-| 1 | Should an order's payer page show a CoDi-native QR (scan with the bank app, as in prototype screen 5) or only the payment link? A QR accepts several payments; a link accepts one. The plan follows the locked rule: link for orders, CoDi QR only for Mostrador. | Founders | WP-OS-04 copy; WP-OS-09 scope |
-| 2 | Can a pey payment link be limited to CoDi? The API has no such field and the example lists `CARD`. Today a card payment goes to `en_revision`. | pey | Verification policy |
-| 3 | pey rate limits. The sondeo polls every 1.5–2 s per watched cobro. | pey | WP-OS-03 defaults |
-| 4 | How is a webhook endpoint registered, and are the event names in `CONTEXT.md` §6 current? | pey / docs.pey.mx | WP-OS-07 |
-| 5 | Does a transaction name its receiving account anywhere? | pey | Stronger destination check |
-| 6 | Which URL goes on the form: the open DEMO deployment (recommended) or the LIVE one behind sign-in? | Founders | WP-OS-06 |
-| 7 | Resolution of `en_revision`: may the owner release manually with a written reason, or only dismiss? | Founders | WP-OS-08 |
+| 1 | Can a pey payment link be limited to CoDi? The API has no such field and the example lists `CARD`. Today a card payment goes to `en_revision`. | pey | Verification policy |
+| 2 | pey rate limits. The sondeo polls every 1.5–2 s per watched cobro. | pey | WP-OS-03 defaults |
+| 3 | How is a webhook endpoint registered, and are the event names in `CONTEXT.md` §6 current? | pey / docs.pey.mx | WP-OS-07 |
+| 4 | Does a transaction name its receiving account anywhere? | pey | Stronger destination check |
 
 ## Risks
 

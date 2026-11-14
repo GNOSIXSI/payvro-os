@@ -15,7 +15,7 @@ PAYVRO hace esto: creas un cobro, tu cliente paga con CoDi desde la app de su ba
 - Si algo no cuadra (otro monto, pago doble), el cobro pasa a **En revisión** y no se libera solo.
 - Todo queda en una bitácora que tú puedes leer.
 
-PAYVRO OS es la versión abierta: una instalación para un negocio, con tus propias cuentas y tu propia llave de pey. La instala tu agente de código, también en tu computadora.
+PAYVRO OS es código disponible (fair-code): una instalación para un negocio, con tus propias cuentas y tu propia llave de pey. La instala tu agente de código, también en tu computadora.
 
 > **Estado:** en construcción, en público, durante el Hackatón México (14-nov a 12-dic de 2026). Lo que ya funciona y lo que falta está en [`PLAN.md`](PLAN.md). El diario de construcción está en [`docs/bitacora/`](docs/bitacora/).
 
@@ -25,7 +25,7 @@ El modo DEMO no usa llaves ni dinero real: un simulador hace el papel de pey.
 
 1. Abre la demo en vivo: _el enlace se publica aquí al cierre del hito 1 (domingo 15-nov)._
 2. En el panel, toca **Nuevo cobro**. Escribe un concepto y un monto.
-3. Toca **Copiar link** y ábrelo: es lo que ve tu cliente.
+3. Abre la página del cobro: muestra el QR CoDi para pagar con la app del banco.
 4. Toca **Simular pago**.
 5. La página cambia a **Pago verificado** y en el panel el pedido aparece como **Liberado**.
 
@@ -58,7 +58,7 @@ Un solo motor, cuatro pasos:
 | | Paso | Qué pasa |
 |---|---|---|
 | 1 | **Intención** | Un pedido, una cita o una cotización. |
-| 2 | **Cobro CoDi** | PAYVRO crea un link de pago con la API de pey. |
+| 2 | **Cobro CoDi** | PAYVRO crea un QR CoDi de monto fijo; el link de pago queda como alternativa. |
 | 3 | **Pago verificado** | PAYVRO consulta a pey con tu llave y compara monto y cuenta. |
 | 4 | **Liberación** | El pedido pasa a «Liberado» y queda en la bitácora. |
 
@@ -81,12 +81,12 @@ Hecho con Next.js, Clerk, Convex y la API de pey. El detalle está en [`ARCHITEC
 
 ## PAYVRO OS y PAYVRO Cloud
 
-El motor es abierto; la nube es el servicio. PAYVRO OS (este repositorio, MIT) es para quien quiere instalarlo y operarlo por su cuenta. PAYVRO Cloud es el servicio hospedado por GNOSIX para quien prefiere no instalar nada. Los dos usan el mismo motor.
+El motor está disponible bajo FSL-1.1-ALv2; la nube es el servicio. PAYVRO OS es para quien quiere instalarlo y operarlo por su cuenta. PAYVRO Cloud es el servicio hospedado por GNOSIX para quien prefiere no instalar nada. Los dos usan el mismo motor.
 
 ## Licencia
 
-Código bajo licencia [MIT](LICENSE). © 2026 GNOSIX.
-El nombre PAYVRO y sus logos no forman parte de la licencia MIT; ver [`public/brand/README.md`](public/brand/README.md).
+Código disponible (fair-code) bajo la licencia [FSL-1.1-ALv2](LICENSE), con conversión a Apache-2.0 a los dos años. © 2026 GNOSIX.
+El nombre PAYVRO y sus logos no forman parte de la licencia; ver [`TRADEMARKS.md`](TRADEMARKS.md).
 
 ## Créditos
 

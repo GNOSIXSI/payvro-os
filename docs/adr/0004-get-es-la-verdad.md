@@ -5,7 +5,7 @@
 ## Context
 
 Facts
-- pey sends each webhook once and does not retry (told by pey in person, 2026-11-07).
+- pey sends each webhook once and does not retry (per pey, 2026-11-07).
 - pey webhooks are signed following Standard Webhooks (same source). The OpenAPI snapshot of 2026-11-14 does not describe webhooks at all.
 - pey has no expiry or cancel event.
 - `GET /payment-link/{id}` and `GET /transaction/{id}` return status, amounts with breakdown, payable type and id, and only for the API key that owns them.

@@ -1,6 +1,6 @@
 # AGENTS — rules for any agent working in this repo
 
-This repo is PAYVRO OS: public, MIT, the Hackatón México submission. It handles verification of real payments. Read in this order before touching anything: `CONTEXT.md` (words and invariants), `ARCHITECTURE.md` (the spec), your work package in `docs/wp/`, then `SECURITY.md`.
+This repo is PAYVRO OS: public, source-available under FSL-1.1-ALv2 (Apache-2.0 after two years), the Hackatón México submission. It handles verification of real payments. Read in this order before touching anything: `CONTEXT.md` (words and invariants), `ARCHITECTURE.md` (the spec), your work package in `docs/wp/`, then `SECURITY.md`.
 
 If you are an agent **installing** PAYVRO for a business owner, you are in the wrong file: read `INSTALL.md`.
 

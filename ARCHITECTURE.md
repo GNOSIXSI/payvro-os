@@ -245,11 +245,11 @@ stateDiagram-v2
 | `esperando_pago` | cron, `now ≥ expiraEn` | no paid evidence | `expirado` | `cobro.expirado` |
 | `borrador`, `esperando_pago` | dueño cancels | | `cancelado` | `cobro.cancelado` |
 | `expirado`, `cancelado` | paid transaction found | | `en_revision` (`pago_tardio`) | `pago.no_coincide`, `cobro.en_revision` |
-| `liberado` | second distinct paid transaction | | stays `liberado`, `alerta = pago_duplicado` | `pago.duplicado` |
+| `liberado` | second distinct paid transaction on its order QR | | stays `liberado`, `alerta = pago_duplicado`; the extra payment is held in `en_revision` | `pago.duplicado` |
 
 For the `pedido` template, `pagado_verificado → liberado` happens in the same mutation as the verification, as two bitácora entries. The two states stay separate because later templates release through a side effect (confirm an appointment, notify) that can fail and retry.
 
-There is no transition out of `liberado`. There is no transition into `pagado_verificado` or `liberado` from any public function.
+There is no transition out of `liberado`: a duplicate QR payment is reviewed separately and never reopens the released cobro. There is no transition into `pagado_verificado` or `liberado` from any public function.
 
 ### 5.2 Intento
 
@@ -361,7 +361,7 @@ OS implementation: one negocio; identity checked against `PAYVRO_OWNER_EMAILS` i
 
 ## 7. Flows
 
-### 7.1 Create a charge (LIVE, link)
+### 7.1 Create a charge (LIVE, native CoDi QR)
 
 ```mermaid
 sequenceDiagram
@@ -376,20 +376,20 @@ sequenceDiagram
   CX->>CX: insert cobro (borrador) + intento (reservado)<br/>bitácora: cobro.creado, intento.reservado
   CX-->>UI: cob_…, folio
   CX-)AC: schedule motor.intentos.crearEnPey(intentoId)
-  AC->>PEY: POST /payment-link/create (clientReferenceId = int_…)
+  AC->>PEY: POST /codi/qr (fixed amount, expiration = 86400 s)
   alt 2xx
-    PEY-->>AC: {id, url}
+    PEY-->>AC: {id, qrString, qrImage?}
     AC->>CX: registrarCreado → intento creado, cobro esperando_pago
   else 4xx
     AC->>CX: registrarFallido → intento fallido, cobro borrador
   else timeout / 5xx
     AC->>CX: registrarIncierto → intento incierto (never re-POST)
   end
-  CX-->>UI: reactive update: link listo
-  D->>UI: Copiar link → /pagar/cob_…
+  CX-->>UI: reactive update: QR CoDi listo
+  D->>UI: Mostrar QR CoDi → /pagar/cob_…
 ```
 
-Repeating `cobros.crear` with the same `claveIdempotencia` and the same input returns the same cobro; with different input it throws `CLAVE_REUTILIZADA`.
+Repeating `cobros.crear` with the same `claveIdempotencia` and the same input returns the same cobro; with different input it throws `CLAVE_REUTILIZADA`. The QR is the default. "Pagar con link" is a fallback after the QR intento is terminal or expired because pey cannot cancel an active QR; verification still watches the prior intento for late payment.
 
 ### 7.2 Pay and release (LIVE)
 
@@ -405,9 +405,9 @@ sequenceDiagram
   PG->>CX: publico.cobro(publicId) (reactive)
   PG->>CX: publico.vigilar(publicId) every 10 s
   CX-)T: start tick chain if not running
-  P->>PEY: paga en la página de pey con su app bancaria (CoDi)
+  P->>PEY: escanea el QR con su app bancaria y paga con CoDi
   loop every 1.5–2 s while vigilado and esperando_pago
-    T->>PEY: GET /payment-link/{id}
+    T->>PEY: GET /transaction/codi/qr/{id}
     T->>PEY: GET /transaction/{id} (for each listed transaction)
     T->>CX: aplicarEvidencia(intentoId, evidencia, "sondeo")
   end
@@ -453,13 +453,13 @@ A paid transaction in the listing that names no known intento is logged once (`e
 
 ### 7.4 Return URLs and local mode
 
-pey requires HTTPS `successUrl` and `backUrl`. Both always point to the Convex HTTP action `GET /volver?c=cob_…`, which exists on every Convex cloud deployment (`https://<deployment>.convex.site`):
+For the payment-link fallback, pey requires HTTPS `successUrl` and `backUrl`. Both point to the Convex HTTP action `GET /volver?c=cob_…`, which exists on every Convex cloud deployment (`https://<deployment>.convex.site`):
 - with `PAYVRO_PUBLIC_URL` set → 302 to `${PAYVRO_PUBLIC_URL}/pagar/cob_…`;
 - without it (local mode) → a minimal HTML page: "Gracias. Estamos verificando tu pago; ya puedes cerrar esta página."
 
 `/volver` is navigation only. It records an `evento` with `origen: retorno` to trigger a verification and proves nothing.
 
-Local mode (ADR-0007): Next.js on `localhost`, Convex cloud dev deployment. The payer page is not reachable from the pagador's phone, so the dueño shares the pey link itself (`urlPago`) or shows a QR of it. Truth comes from the sondeo (while the panel is open) and the cron sweep (always). The webhook is optional and works even in local mode because the HTTP action URL is public; with a fully offline Convex backend there is no public URL at all and links are unavailable (the panel says so).
+Local mode (ADR-0007): Next.js on `localhost`, Convex cloud dev deployment. The payer page is not reachable from the pagador's phone, so the dueño shows the native CoDi QR; the pey payment link (`urlPago`) is the fallback. Truth comes from the sondeo (while the panel is open) and the cron sweep (always). The webhook is optional and works even in local mode because the HTTP action URL is public; with a fully offline Convex backend there is no public URL at all and links are unavailable (the panel says so).
 
 ### 7.5 DEMO
 
@@ -472,7 +472,7 @@ sequenceDiagram
   participant SIM as Simulador (PeyPuerto)
   J->>UI: Nuevo cobro
   UI->>CX: cobros.crear(…)
-  CX-)SIM: crearLink → simPayables
+  CX-)SIM: crearQr → simPayables
   J->>UI: "Simular pago  DEMO"
   UI->>CX: demo.simularPago(publicId, variante)
   CX->>SIM: marca simTransaccion PAID
@@ -490,14 +490,14 @@ Names are final; WP-OS-01 ships them as typed stubs, WP-OS-02 implements them.
 |---|---|---|---|
 | `negocio.obtener()` | query | panel | `{nombre, giro, colorMarca, modo, cobrosPausados, cuentaLista}` |
 | `negocio.actualizarPerfil({nombre, giro, colorMarca})` | mutation | dueño | `{ok}`. Cannot touch mode or destination. |
-| `cobros.crear({claveIdempotencia, concepto, montoCentavos, tipo?})` | mutation | dueño | `{publicId, folio, estado}`. `tipo` defaults to `link`. |
+| `cobros.crear({claveIdempotencia, concepto, montoCentavos, tipo?})` | mutation | dueño | `{publicId, folio, estado}`. `tipo` defaults to `qr`. |
 | `cobros.listar({estado?, paginationOpts})` | query | panel | page of `{publicId, folio, concepto, montoCentavos, estado, alerta?, creadoEn}` |
 | `cobros.obtener({publicId})` | query | panel | cobro + intento activo (`urlPago`, `qrString`) + pago summary |
 | `cobros.resumenDelDia()` | query | panel | `{verificadoHoyCentavos, porLiberar, enRevision}` (the three tiles of the approved panel) |
 | `cobros.cancelar({publicId, claveIdempotencia})` | mutation | dueño | `{estado}` |
 | `cobros.reintentar({publicId, claveIdempotencia})` | mutation | dueño | New intento when the previous one is `fallido`/`descartado`. |
 | `panel.bitacora({cobroPublicId?, paginationOpts})` | query | panel | entries, newest first |
-| `publico.cobro({publicId})` | query | payer page | `{negocio:{nombre,colorMarca}, folio, concepto, montoCentavos, estadoVisible, urlPago?, modo}`. Nothing else. |
+| `publico.cobro({publicId})` | query | payer page | `{negocio:{nombre,colorMarca}, folio, concepto, montoCentavos, estadoVisible, qrString?, urlPago?, modo}`. Nothing else. |
 | `publico.vigilar({publicId})` | mutation | payer page, panel detail | `{ok}`. Heartbeat for the sondeo. |
 | `demo.simularPago({publicId, variante})` | mutation | DEMO only | `{ok}` |
 
@@ -513,12 +513,12 @@ Screens of M1 follow the approved prototype (presentation, slides 6 and 7):
 |---|---|
 | `/` | What this install is, mode tag, button to the panel. |
 | `/panel` | Three tiles (Cobrado hoy, Por liberar, En revisión) and the cobros table: folio, concepto, monto, estado chip. |
-| `/panel/nuevo` | Concepto + monto → creates the cobro. Then: "Copiar link", "Mostrar QR", and a disabled "Enviar por WhatsApp" with the note "Disponible en PAYVRO Cloud (plan Pro)". |
-| `/panel/cobros/[publicId]` | Detail, estado, timeline (Cobro creado · Pago verificado · Liberado) from the bitácora. |
+| `/panel/nuevo` | Concepto + monto → creates the cobro. Then: native CoDi QR (fixed amount, 24-hour expiration); "Pagar con link" is offered only after the QR intento is terminal or expired. A disabled "Enviar por WhatsApp" carries the note "Disponible en PAYVRO Cloud (plan Pro)". |
+| `/panel/cobros/[publicId]` | Detail, estado, timeline (Cobro creado · Pago verificado · Liberado) from the bitácora. Shows the native CoDi QR; offers "Pagar con link" only when the QR intento is terminal or expired. |
 | `/panel/ajustes` | Nombre, giro, color. Read-only: mode, whether the account is `ACTIVE`. Never shows the key, the account id or a CLABE. |
-| `/pagar/[publicId]` | Payer page: business name on its color, amount, concept, "Pagar con CoDi" button to `urlPago`, estado chip, DEMO button "Simular pago" when in DEMO. |
+| `/pagar/[publicId]` | Payer page: business name on its color, amount, concept, native CoDi QR with a 24-hour expiration, link fallback when available, estado chip, DEMO button "Simular pago" when in DEMO. |
 
-"Mostrar QR" for an order shows a QR **of the payment link URL**, labeled "Escanea con la cámara de tu celular para abrir el pago". A CoDi-native QR (scanned from the bank app) arrives with the Mostrador template (WP-OS-09). See open question in `PLAN.md`.
+An order's QR is scanned from the payer's bank app and carries the fixed cobro amount. A payment link is a separately reserved fallback; it is not created while the QR intento remains active.
 
 Tokens: ink `#142B3B`, warm white `#F5F3EC`, petróleo `#076B76`; knot accents `#00B8B2`, `#EF006D`, `#FFC400`, `#FF7900`; line `#D9D5C8`; muted text `#4A5E6B`. Fonts: Noto Sans Display (headings), Noto Sans (body). Chips: `CONTEXT.md` §5. Motion ≤ 200 ms ease-out, none on high-frequency actions, respect `prefers-reduced-motion`. Touch targets ≥ 44 px. Focus ring 3 px petróleo. Copy is Spanish (Mexico), direct, no hype.
 
@@ -546,4 +546,4 @@ Every new test is seen failing first, and the PR says how. Put the adversarial c
 
 ## 12. What M1 does not have
 
-Webhook route and listing sweep (WP-OS-07, first after M1), manual resolution of `en_revision`, CoDi-native QR, push CoDi, other templates, agent tokens and MCP, WhatsApp, notifications to the pagador, exports. See `PLAN.md`.
+Webhook route and listing sweep (WP-OS-07, first after M1), manual resolution of `en_revision`, push CoDi, other templates, agent tokens and MCP, WhatsApp, notifications to the pagador, exports. See `PLAN.md`.
