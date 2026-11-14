@@ -1,3 +1,3 @@
 import { defineSchema } from "convex/server";
-
-export default defineSchema({});
+import { tablasMotor } from "./motor/tablas";
+export default defineSchema({ ...tablasMotor });
