@@ -154,7 +154,7 @@ export const obtener = query({
       cobro.estado === "pagado_verificado" || cobro.estado === "liberado" || cobro.estado === "en_revision"
         ? {
             publicId: `pag_${String(cobro.folio).padStart(26, "0")}`,
-            resultado: cobro.estado === "en_revision" ? "duplicado" : "coincide",
+            resultado: cobro.estado === "en_revision" ? ("duplicado" as const) : ("coincide" as const),
             metodo: "CODI" as const,
             baseCentavos: cobro.montoCentavos,
             totalCentavos: cobro.montoCentavos,
