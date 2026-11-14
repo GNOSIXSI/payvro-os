@@ -12,7 +12,7 @@ milestone: M1
 
 ## Goal
 
-In a LIVE deployment, a cobro creates a real pey payment link, and a real payment is found by polling and by the per-intento sweep, verified and released — without a webhook.
+In a LIVE deployment, a cobro creates a real native CoDi QR by default; a payment link is the fallback. A real payment is found by polling and by the per-intento sweep, verified and released — without a webhook.
 
 ## Files it may touch
 
@@ -35,8 +35,8 @@ In a LIVE deployment, a cobro creates a real pey payment link, and a real paymen
 2. `pey/cliente.ts`: `crearClientePey({ apiKey, bankAccountId, fetch, modo })` → `PeyPuerto`.
    - Throws `MODO_INVALIDO` unless `modo === "live"`.
    - Host fixed to `https://api.pey.mx`; paths are constants; ids are validated before being put in a path; `redirect: "error"`; 10 s timeout via `AbortController`; `Authorization: Bearer` set in one place; nothing logs headers or bodies.
-   - `crearLink`: body per §6.2 (`hasTip: false`, `clientReferenceId`, metadata with ids only). 2xx → `creado` only if `url` matches `^https://app\.mipey\.mx/payment-link/[0-9A-Z]{26}$` and its id equals `id`; otherwise `incierto`. 4xx → `rechazado` with `errorType` and `requestId`. Timeout, network error, 5xx → `incierto`.
-   - `crearQr`: implemented and unit-tested, refuses `montoCentavos < 1` and `expiraSeg < 360`; not wired to any UI in M1.
+   - `crearQr`: default for an order; body includes fixed amount, `expiration: 86400`, `numRef`, and metadata with ids only. Refuses `montoCentavos < 1` and an expiration below 360 seconds. 2xx → `creado` only after validating the response shape; 4xx → `rechazado`; timeout, network error, 5xx → `incierto`.
+   - `crearLink`: fallback, body per §6.2 (`hasTip: false`, `clientReferenceId`, metadata with ids only). 2xx → `creado` only if `url` matches `^https://app\.mipey\.mx/payment-link/[0-9A-Z]{26}$` and its id equals `id`; otherwise `incierto`. 4xx → `rechazado` with `errorType` and `requestId`. Timeout, network error, 5xx → `incierto`.
    - Reads: `leerLink`, `leerTransaccion`, `listarTransaccionesQr`, `listarTransacciones`, `leerCuenta` (returns `codiStatus` only; `clabe` and `name` are dropped before the function returns).
    - GETs retry at most twice on 5xx/timeout with jitter. POSTs never retry.
 3. `convex/puertos.ts` LIVE: `credencialPey` reads `PEY_API_KEY` and `PEY_BANK_ACCOUNT_ID`; missing → `ConvexError CUENTA_NO_ACTIVA` with a Spanish message (this is also how "remove the key to stop charging" behaves). `urlsRetorno` builds `https://<CONVEX_SITE_URL>/volver?c=cob_…` for both URLs.
@@ -46,7 +46,7 @@ In a LIVE deployment, a cobro creates a real pey payment link, and a real paymen
 7. `convex/motor/cuenta.ts`: `comprobarCuenta` internal action (`leerCuenta` → store `cuentaLista` and the time on the negocio row); run at first LIVE use and daily. `cobros.crear` in LIVE refuses with `CUENTA_NO_ACTIVA` when the last check is not `ACTIVE`.
 8. Tests (no network; `fetch` is a fake). Each seen failing first:
    - Contract: for each recorded shape in `tests/pey/formas/`, the client returns the expected typed value. Shapes come from the OpenAPI examples with CLABE `000000000000000000` and no person's name.
-   - Request: the POST body for a 14900-centavo cobro has `amount: 149`, `hasTip: false`, the `int_` reference, HTTPS return URLs, and no extra field.
+   - Request: the QR POST body for a 14900-centavo cobro has `amount: 149`, `expiration: 86400`, `numRef`, and the `int_` reference, with no extra field. The fallback link request has `hasTip: false`, the `int_` reference, HTTPS return URLs, and no extra field.
    - Outcomes: 200 valid → `creado`; 200 with a URL on another host → `incierto`; 400 → `rechazado`; 500, abort and thrown fetch → `incierto`; in all `incierto` cases the fake saw exactly one POST.
    - SSRF: an id containing `/`, `?`, `#`, `..` or `@` is rejected before any request.
    - Mode: constructing the client with `modo: "demo"` throws.
@@ -79,7 +79,7 @@ In the PR: the failing assertion seen per test group; one mutation check (make a
 
 ## Out of scope
 
-Webhook route, listing sweep with a cursor, CoDi QR in the UI, push CoDi, real network calls, deploy.
+Webhook route, listing sweep with a cursor, push CoDi, real network calls, deploy.
 
 ## Risks
 

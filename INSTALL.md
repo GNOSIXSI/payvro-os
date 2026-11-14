@@ -20,12 +20,12 @@ What you are installing: an app where the owner creates a charge, the customer p
 Ask these, one message, in Spanish:
 
 - ¿Quieres primero probarlo en modo DEMO (sin llaves, sin dinero real)? → always yes; it takes minutes.
-- ¿Dónde va a correr? **A)** En internet con Vercel (tus clientes abren un link de PAYVRO). **B)** En esta computadora (modo local: tú compartes el link de pago de pey; no hay página pública de PAYVRO).
+- ¿Dónde va a correr? **A)** En internet con Vercel (tus clientes abren la página del cobro de PAYVRO). **B)** En esta computadora (modo local: tú muestras el QR CoDi; no hay página pública de PAYVRO).
 - ¿Ya tienes cuenta en pey con tu llave de API y tu cuenta bancaria registrada y activa? (Si no: registrar una cuenta en pey tarda hasta 5 días hábiles; mientras tanto puedes usar DEMO.)
 
 | | A · Vercel | B · Local |
 |---|---|---|
-| Customer opens | `https://<your-app>/pagar/cob_…` | The pey payment link directly |
+| Customer opens | `https://<your-app>/pagar/cob_…` | The native CoDi QR shown in the panel; the pey payment link is the fallback |
 | Needs | Vercel + Convex + Clerk accounts | Convex + Clerk accounts, this machine on while charging |
 | How payment is detected | Polling while the page is open, sweep every minute, optional webhook | Polling while the panel is open, sweep every minute, optional webhook |
 | Public URL | Yes | No |
@@ -178,7 +178,7 @@ npm run dev
 ```
 
 What changes in local mode:
-- The customer cannot open `localhost`. The owner shares the **pey payment link** shown in the panel ("Copiar link de pey") or shows its QR.
+- The customer cannot open `localhost`. The owner shows the **native CoDi QR** from the panel; the pey payment link ("Pagar con link") is the fallback.
 - After paying, the customer lands on a small page served by Convex that says the payment is being verified.
 - Detection relies on polling: every 1–2 s while the charge is open in the panel, and a sweep every minute otherwise. Keep `npm run dev` running while charging; the sweep itself runs in Convex and keeps working if the laptop sleeps.
 - Use `npx convex dev` against a Convex **cloud** dev deployment. A fully offline Convex backend has no HTTPS URL, and pey requires HTTPS return URLs for payment links.
@@ -198,8 +198,8 @@ pey sends each event once and does not retry, so PAYVRO never depends on it.
 Ask, in Spanish, and wait for a clear yes: "¿Hago un cobro real de un centavo ($0.01 MXN) para probar? Tú lo pagas desde tu app bancaria con CoDi y el dinero llega a tu propia cuenta."
 
 1. Sign in to the panel as the owner. "Nuevo cobro" → concepto `Prueba PAYVRO`, monto `0.01`.
-2. Expected within a few seconds: state **Esperando pago** and a payment link.
-3. The owner opens the link on their phone and pays with their bank app (CoDi).
+2. Expected within a few seconds: state **Esperando pago** and a native CoDi QR with a fixed amount and 24-hour expiration. The pey payment link is offered as a fallback when the QR intento is terminal or expired.
+3. The owner scans the QR with their bank app and pays with CoDi.
 4. Expected: the panel changes to **Pago verificado** and then **Liberado** without anyone touching it. Typical: under 20 s after the bank confirms (a target, not a measured guarantee).
 5. Open the cobro → bitácora. It must show, in order: `cobro.creado`, `intento.reservado`, `pey.llamada`, `intento.creado`, `pago.verificado`, `cobro.liberado`.
 
@@ -210,11 +210,11 @@ If it goes to **En revisión**: that is PAYVRO refusing to release something tha
 
 Tell the owner, in Spanish:
 - The address of the panel and who can sign in.
-- How to create a charge and what each state means: Esperando pago · Pago verificado · Liberado · En revisión.
+- How to create a charge, show the CoDi QR or use the fallback payment link, and what each state means: Esperando pago · Pago verificado · Liberado · En revisión.
 - That PAYVRO never asks for and never shows their CLABE or their key.
 - How to stop charging: remove `PEY_API_KEY` in the Convex dashboard. Charges stop immediately.
 - How to rotate the key: create a new one in pey, replace it in Convex, delete the old one in pey.
-- Where the code is and that it is MIT-licensed.
+- Where the code is and that it is available under FSL-1.1-ALv2, converting to Apache-2.0 after two years.
 
 Leave no secret in the shell history, in notes or in files you created. Delete any temporary file you wrote.
 

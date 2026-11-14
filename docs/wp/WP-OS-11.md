@@ -17,7 +17,7 @@ The engine has a declared surface and a version, so PAYVRO Cloud can copy an exa
 ## Files it may touch
 
 - `motor.manifest.json`
-- `packages/engine/package.json` (version), `packages/engine/LICENSE` (copy of the MIT license, travels with the vendored code), `packages/engine/README.md`
+- `packages/engine/package.json` (version), `packages/engine/LICENSE` (copy of the FSL-1.1-ALv2 license, travels with the vendored code), `packages/engine/README.md`
 - `convex/motor/README.md`
 - `scripts/motor-manifiesto.mjs`, `package.json` (script `motor:manifiesto`), `scripts/gate.sh`
 - `tests/motor/dos-negocios.test.ts`, `tests/motor/manifiesto.test.ts`

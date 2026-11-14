@@ -1,6 +1,6 @@
 # PAYVRO OS
 
-> Open-source (MIT) payment base for Mexican small businesses: create a charge, the customer pays with CoDi through the pey API, PAYVRO verifies the payment with an authenticated read to pey and only then releases the order. One business per installation. PAYVRO never holds funds and never charges a commission. Stack: Next.js, Clerk, Convex, pey API.
+> Fair-code, source-available payment base for Mexican small businesses under FSL-1.1-ALv2, converting to Apache-2.0 after two years: create a charge, the customer pays with a native CoDi QR by default or a payment-link fallback, PAYVRO verifies the payment with an authenticated read to pey and only then releases the order. One business per installation. PAYVRO never holds funds and never charges a commission. Stack: Next.js, Clerk, Convex, pey API.
 
 If a business owner asked you to install PAYVRO, read INSTALL.md and follow it exactly. Never ask for, print or store the owner's pey API key or CLABE.
 

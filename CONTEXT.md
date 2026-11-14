@@ -112,7 +112,7 @@ API surface
 - **[FACT]** Eleven operations: create QR, create push, register bank account, get bank account, create / update / get payment link, get transaction, list transactions by API key, by bank account, by QR.
 - **[FACT]** There is no cancel for a link or a QR, no expiry event, no refunds, no payouts, no balances. PAYVRO collects; it does not pay out.
 
-Payment link (default for orders)
+Payment link (fallback for orders)
 - **[FACT]** `POST /payment-link/create` requires `amount > 0`, `successUrl`, `backUrl`; both URLs must be HTTPS. Optional `hasTip` (default false), `clientReferenceId` (≤ 255), `metadata`.
 - **[FACT]** It has **no** `bankAccountId`, no expiration and no way to restrict payment methods. The money goes to the account linked to the API key.
 - **[FACT]** Returns `{id, url}`; the example URL is `https://app.mipey.mx/payment-link/{id}`.
@@ -122,9 +122,9 @@ Payment link (default for orders)
 - **[NOTE]** A link takes one payment; it is the option that avoids double charges.
 - **[OPEN]** Whether a link can be limited to CoDi. Whether `partial` can happen with CoDi.
 
-CoDi QR (counter tags, and local fallback)
-- **[FACT]** `POST /codi/qr`: `amount >= 0` (0 lets the payer type the amount — forbidden in PAYVRO), `concept`, `expiration` seconds (0 = none; minimum 360 when set), `numRef` (1–7 digits), `generateImage`, `bankAccountId` (must be `ACTIVE`; omitted = account linked to the key), `metadata`. Returns 201 `{id (IDC), qrString, qrImage?}`.
-- **[NOTE]** One QR accepts several payments. That is why orders use links.
+CoDi QR (default for orders and counter tags)
+- **[FACT]** `POST /codi/qr`: `amount >= 0` (0 lets the payer type the amount — forbidden in PAYVRO), `concept`, `expiration` seconds (0 = none; minimum 360 when set), `numRef` (1–7 digits), `generateImage`, `bankAccountId` (must be `ACTIVE`; omitted = account linked to the key), `metadata`. Returns 201 `{id (IDC), qrString, qrImage?}`. For orders, PAYVRO uses one fixed amount and a 24-hour expiration.
+- **[NOTE]** One QR accepts several payments. Orders use a QR by default under ADR-0006; an additional payment for the same order is held for review. The payment link is the fallback.
 - **[FACT]** `GET /transaction/codi/qr/{id}` lists its transactions, 20 per page.
 
 CoDi push
