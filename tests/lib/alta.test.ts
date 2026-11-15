@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decidirAlta, interpretarAlta, PERFIL_OMITIDO, debeSalirDeBienvenida, seguirTrasFallo } from "../../components/alta-local";
+import { cerrarAlta, decidirAlta, interpretarAlta, PERFIL_OMITIDO, debeSalirDeBienvenida } from "../../components/alta-local";
 
 const DEMO = "Dulces Ana — Ejemplo";
 const GUARDADO = {
@@ -21,7 +21,7 @@ describe("decidirAlta", () => {
     expect(decision.nombre).toBe("Dulces Ana — Ejemplo");
   });
 
-  it("keeps a finished profile when Convex still has no name", () => {
+  it("does not treat a local profile as saved while Convex still has no name", () => {
     const decision = decidirAlta({
       hayConvex: true,
       nombreRemoto: "  ",
@@ -29,8 +29,20 @@ describe("decidirAlta", () => {
       nombreDemo: DEMO,
     });
 
+    expect(decision.mostrarAsistente).toBe(true);
+    expect(decision.nombre).toBe("");
+  });
+
+  it("hides the assistant after an explicit skip even when Convex has no name", () => {
+    const decision = decidirAlta({
+      hayConvex: true,
+      nombreRemoto: "",
+      altaLocal: "omitido",
+      nombreDemo: DEMO,
+    });
+
     expect(decision.mostrarAsistente).toBe(false);
-    expect(decision.nombre).toBe("Negocio de ejemplo");
+    expect(decision.nombre).toBe(PERFIL_OMITIDO.nombre);
   });
 
   it("opens the assistant when Convex has no name and this browser has not finished", () => {
@@ -117,15 +129,48 @@ describe("debeSalirDeBienvenida", () => {
   });
 });
 
-describe("seguirTrasFallo", () => {
-  it("lets Omitir continue and lets Ir a mi panel continue only on NO_IMPLEMENTADO", () => {
-    const noImplementado = { data: { codigo: "NO_IMPLEMENTADO", mensaje: "La actualización del perfil todavía no está disponible." } };
-    const otro = { data: { codigo: "DATOS_INVALIDOS", mensaje: "Revisa el nombre." } };
+describe("cerrarAlta", () => {
+  const noImplementado = {
+    data: { codigo: "NO_IMPLEMENTADO", mensaje: "La actualización del perfil todavía no está disponible." },
+  };
 
-    expect(seguirTrasFallo(false, otro)).toBe(true);
-    expect(seguirTrasFallo(true, noImplementado)).toBe(true);
-    expect(seguirTrasFallo(true, otro)).toBe(false);
-    expect(seguirTrasFallo(true, new Error("red"))).toBe(false);
+  it("keeps the form when saving fails, including NO_IMPLEMENTADO, and never marks it saved", () => {
+    expect(cerrarAlta("guardar", noImplementado)).toEqual({
+      navegar: false,
+      marcarOmitido: false,
+      mostrarError: true,
+    });
+    expect(cerrarAlta("guardar", { data: { codigo: "DATOS_INVALIDOS", mensaje: "Revisa el nombre." } })).toEqual({
+      navegar: false,
+      marcarOmitido: false,
+      mostrarError: true,
+    });
+    expect(cerrarAlta("guardar", new Error("red"))).toEqual({
+      navegar: false,
+      marcarOmitido: false,
+      mostrarError: true,
+    });
+  });
+
+  it("navigates after the server accepts a save without writing a local skip", () => {
+    expect(cerrarAlta("guardar", null)).toEqual({
+      navegar: true,
+      marcarOmitido: false,
+      mostrarError: false,
+    });
+  });
+
+  it("treats Omitir as a local skip that does not depend on the server", () => {
+    expect(cerrarAlta("omitir", noImplementado)).toEqual({
+      navegar: true,
+      marcarOmitido: true,
+      mostrarError: false,
+    });
+    expect(cerrarAlta("omitir", null)).toEqual({
+      navegar: true,
+      marcarOmitido: true,
+      mostrarError: false,
+    });
   });
 });
 
@@ -133,6 +178,7 @@ describe("interpretarAlta", () => {
   it("stays off unless the session is the exact pending flag or a valid profile", () => {
     expect(interpretarAlta(null)).toBeNull();
     expect(interpretarAlta("pendiente")).toBe("pendiente");
+    expect(interpretarAlta("omitido")).toBe("omitido");
     expect(interpretarAlta("pendiente ")).toBeNull();
     expect(interpretarAlta("{")).toBeNull();
     expect(interpretarAlta(JSON.stringify({ nombre: "Negocio de ejemplo", giro: "no", colorMarca: "#076B76" }))).toBeNull();
