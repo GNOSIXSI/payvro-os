@@ -24,6 +24,19 @@ describe("payment verification policy", () => {
     expect(evaluar(esperado, evidence([], { status: "partial", amount: 149, clientReferenceId: esperado.intentoPublicId, metadata: {}, transactions: [] }))).toMatchObject({ motivo: "parcial" });
     expect(evaluar(esperado, evidence([transaction(), transaction({ transactionId: "tx2" })]))).toMatchObject({ motivo: "duplicado" });
   });
+  it("returns only paid transactions matching the payable for a partial link", () => {
+    const pagada = transaction({ transactionId: "tx_paid" });
+    const pendiente = transaction({ transactionId: "tx_pending", status: "PENDING", datePaid: undefined });
+    const ajena = transaction({ transactionId: "tx_other_payable", payableId: "another-payable" });
+
+    expect(evaluar(esperado, evidence([pagada, pendiente, ajena], {
+      status: "partial", amount: 149, clientReferenceId: esperado.intentoPublicId, metadata: {}, transactions: [],
+    }))).toMatchObject({
+      resultado: "revisar",
+      motivo: "parcial",
+      transacciones: [pagada],
+    });
+  });
   it("ignores pending, unrelated payable and non-MXN transactions", () => {
     expect(evaluar(esperado, evidence([transaction({ status: "PENDING" })])).resultado).toBe("sin_pago");
     expect(evaluar(esperado, evidence([transaction({ payableId: "other" })])).resultado).toBe("sin_pago");
