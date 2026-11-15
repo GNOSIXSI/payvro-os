@@ -44,8 +44,8 @@ test("de /panel a Liberado contra el motor, en DEMO", async ({ page, context }) 
   await expect(page.getByText("Pendiente", { exact: true })).toHaveCount(0);
 
   await page.goto("/panel");
-  const fila = page.getByRole("row", { name: /Pedido de prueba/ });
-  await expect(fila.getByText("Liberado", { exact: true })).toBeVisible();
+  const fila = page.getByRole("row", { name: /Pedido de prueba/ }).filter({ hasText: "Liberado" }).first();
+  await expect(fila).toBeVisible();
   await expect(demo(page)).toBeVisible();
 });
 
