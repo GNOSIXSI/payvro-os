@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { BotonCopiar } from "@/components/boton-copiar";
 import { ChipEstado } from "@/components/chip-estado";
 import { LineaDeTiempo, type EntradaBitacora } from "@/components/linea-de-tiempo";
@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { estadoParaDueno } from "@/lib/estados";
 import type { EstadoCobro } from "@/lib/estados";
 import { textoDeMotivo } from "@/lib/motivos";
-import { destinoDeCopia } from "@/lib/url-copia";
+import { destinoDeCopia, type DestinoCopia } from "@/lib/url-copia";
 
 export type DetalleCobroDatos = {
   publicId: string;
@@ -83,12 +83,25 @@ function MostrarQr({ valor }: { valor: string }) {
 }
 
 function CopiaPagina({ publicId, urlPago }: { publicId: string; urlPago?: string }) {
-  return (
-    <BotonCopiar
-      etiqueta="Copiar link"
-      obtenerTexto={() => destinoDeCopia(publicId, urlPago).texto}
-    />
-  );
+  const [destino, setDestino] = useState<DestinoCopia | null>(null);
+
+  useEffect(() => {
+    setDestino(destinoDeCopia(publicId, urlPago));
+  }, [publicId, urlPago]);
+
+  if (!destino?.disponible) {
+    return (
+      <div className="flex flex-col gap-2">
+        <Button type="button" disabled className="min-h-11">
+          Copiar link
+        </Button>
+        <p className="text-sm text-muted">El link de pago aún no está disponible</p>
+      </div>
+    );
+  }
+
+  const texto = destino.texto;
+  return <BotonCopiar etiqueta={destino.etiqueta} obtenerTexto={() => texto} />;
 }
 
 function WhatsAppDeshabilitado() {
