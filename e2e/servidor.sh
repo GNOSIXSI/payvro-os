@@ -60,10 +60,6 @@ restaurar() {
     exit "$estado"
   fi
   restaurado=1
-  if [[ -n "$convex_pid" ]]; then
-    kill -TERM -- -"$convex_pid" 2>/dev/null || kill "$convex_pid" 2>/dev/null || true
-    wait "$convex_pid" 2>/dev/null || true
-  fi
   rm -f .env.local
   if [[ -n "$backup_env_local" ]]; then
     mv "$backup_env_local" .env.local
@@ -76,15 +72,14 @@ restaurar() {
   if [[ -n "$backup_dot_convex" ]]; then
     mv "$backup_dot_convex" .convex
   fi
+  if [[ -n "$convex_pid" ]]; then
+    kill -TERM "$convex_pid" 2>/dev/null || true
+    pkill -TERM -P "$convex_pid" 2>/dev/null || true
+    wait "$convex_pid" 2>/dev/null || true
+  fi
   exit "$estado"
 }
 trap restaurar EXIT INT TERM
-
-if ! npx convex dev --once --typecheck disable --tail-logs disable >"$registro" 2>&1; then
-  echo "el push de este HEAD al backend local de Convex falló" >&2
-  cat "$registro" >&2 || true
-  exit 1
-fi
 
 valor_env() {
   local clave="$1"
@@ -101,17 +96,43 @@ valor_env() {
   printf '%s' "$valor"
 }
 
-url="$(valor_env NEXT_PUBLIC_CONVEX_URL)"
-if [[ -z "$url" ]]; then
-  url="$(valor_env CONVEX_URL)"
-fi
-deployment="$(valor_env CONVEX_DEPLOYMENT)"
+exigir_destino_local() {
+  url="$(valor_env NEXT_PUBLIC_CONVEX_URL)"
+  if [[ -z "$url" ]]; then
+    url="$(valor_env CONVEX_URL)"
+  fi
+  deployment="$(valor_env CONVEX_DEPLOYMENT)"
+  if [[ ! "$url" =~ ^https?://(127\.0\.0\.1|localhost|\[::1\]):[0-9]+/?$ ]] \
+    || [[ ! "$deployment" =~ ^(anonymous|local):[^[:space:]#]+$ ]]; then
+    echo "el destino resuelto no es un backend local anónimo (${deployment:-sin deployment} ${url:-sin url})" >&2
+    exit 1
+  fi
+}
 
-if [[ ! "$url" =~ ^https?://(127\.0\.0\.1|localhost|\[::1\]):[0-9]+/?$ ]] \
-  || [[ ! "$deployment" =~ ^(anonymous|local):[^[:space:]#]+$ ]]; then
-  echo "el destino resuelto no es un backend local anónimo (${deployment:-sin deployment} ${url:-sin url})" >&2
+if ! npx convex dev --once --skip-push --typecheck disable --tail-logs disable >"$registro" 2>&1; then
+  echo "no se pudo crear el backend local anónimo" >&2
+  cat "$registro" >&2 || true
   exit 1
 fi
+
+exigir_destino_local
+
+# auth.config.ts names CLERK_JWT_ISSUER_DOMAIN. A fresh backend has no value, so
+# `convex dev --once` exits non-zero until one is set. DEMO e2e does not sign in;
+# the host is reserved and is not a real issuer.
+if ! npx convex env set CLERK_JWT_ISSUER_DOMAIN "https://issuer.ejemplo.invalid" >>"$registro" 2>&1; then
+  echo "no se pudo preparar el backend local para el push" >&2
+  cat "$registro" >&2 || true
+  exit 1
+fi
+
+if ! npx convex dev --once --typecheck disable --tail-logs disable >>"$registro" 2>&1; then
+  echo "el push de este HEAD al backend local de Convex falló" >&2
+  cat "$registro" >&2 || true
+  exit 1
+fi
+
+exigir_destino_local
 
 export NEXT_PUBLIC_CONVEX_URL="$url"
 export PORT="${PORT:-3105}"
@@ -119,7 +140,8 @@ puerto="${url##*:}"
 puerto="${puerto%%/*}"
 
 # `convex dev --once` stops the backend when it exits. Start it again for Next.
-setsid npx convex dev --typecheck disable --tail-logs disable >>"$registro" 2>&1 &
+# Stay in this process group so the test runner's shutdown signal reaches it.
+npx convex dev --typecheck disable --tail-logs disable >>"$registro" 2>&1 &
 convex_pid=$!
 
 listo=0
