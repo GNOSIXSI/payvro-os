@@ -4,7 +4,7 @@ You are a coding agent. A business owner asked you to install PAYVRO OS for **th
 
 What you are installing: an app where the owner creates a charge, the customer pays with CoDi, PAYVRO checks the payment directly with pey and only then marks the order as released. One business per installation. PAYVRO never touches the money and never charges a commission.
 
-> **Status of this document (2026-11-14):** the repository is being built this weekend. Steps marked **[05]** depend on scripts delivered by work package WP-OS-05 (`npm run doctor`, `npm run smoke:demo`). If a command in this file does not exist in the checkout you cloned, stop and tell the owner which one; do not improvise a replacement that handles secrets.
+> **Status of this document (2026-11-15):** `npm run doctor` and `npm run smoke:demo` exist in this checkout. The clean-machine walk and sections 4–7 have not been run against a cloud deployment. Steps marked **[05]** are the checks that still need that deployment. If a command in this file does not exist in the checkout you cloned, stop and tell the owner which one; do not improvise a replacement that handles secrets.
 
 ## 0. Rules you must not break
 
