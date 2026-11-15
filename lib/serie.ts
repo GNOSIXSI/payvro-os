@@ -2,6 +2,14 @@ export type CobroParaSerie = {
   estado: string;
   montoCentavos: number;
   creadoEn: number;
+  verificadoEn?: number;
+  liberadoEn?: number;
+};
+
+export type RotuloIngresos = {
+  titulo: string;
+  prefijo: string;
+  aviso: string | null;
 };
 
 export type DiaSerie = {
@@ -12,6 +20,57 @@ export type DiaSerie = {
 
 const ZONA = "America/Mexico_City";
 const ESTADOS_INGRESO = new Set(["pagado_verificado", "liberado"]);
+
+// cobros.listar returns creadoEn only (ARCHITECTURE §8). verificadoEn and
+// liberadoEn are read when a row actually carries them. Until the contract
+// grows, the panel must use the creation-day label. Noted for WP-OS-05.
+
+export function rotuloIngresos(opciones: { porCreacion: boolean; parcial: boolean }): RotuloIngresos {
+  if (opciones.porCreacion) {
+    return {
+      titulo: "Cobros liberados por día de creación",
+      prefijo: "Suma por día de creación",
+      aviso: opciones.parcial ? "Datos parciales" : null,
+    };
+  }
+  if (opciones.parcial) {
+    return {
+      titulo: "Muestra de cobros liberados",
+      prefijo: "Suma de la muestra",
+      aviso: "Datos parciales",
+    };
+  }
+  return {
+    titulo: "Ingresos de los últimos 7 días",
+    prefijo: "Total de la semana",
+    aviso: null,
+  };
+}
+
+export function agrupaPorCreacion(cobros: readonly CobroParaSerie[]): boolean {
+  let conto = false;
+  for (const cobro of cobros) {
+    if (!cuentaParaSerie(cobro)) {
+      continue;
+    }
+    conto = true;
+    if (instanteDeIngreso(cobro).porCreacion) {
+      return true;
+    }
+  }
+  return !conto;
+}
+
+export function leerMarcas(fila: object): { verificadoEn?: number; liberadoEn?: number } {
+  const marcas: { verificadoEn?: number; liberadoEn?: number } = {};
+  if ("verificadoEn" in fila && esInstante(fila.verificadoEn)) {
+    marcas.verificadoEn = fila.verificadoEn;
+  }
+  if ("liberadoEn" in fila && esInstante(fila.liberadoEn)) {
+    marcas.liberadoEn = fila.liberadoEn;
+  }
+  return marcas;
+}
 
 export function serieIngresos(
   cobros: readonly CobroParaSerie[],
@@ -70,17 +129,15 @@ function diaCalendario(
 }
 
 function sumarSiCuenta(totales: Map<string, number>, cobro: CobroParaSerie): void {
-  if (!ESTADOS_INGRESO.has(cobro.estado)) {
+  if (!cuentaParaSerie(cobro)) {
     return;
   }
-  if (!Number.isSafeInteger(cobro.montoCentavos) || cobro.montoCentavos < 0) {
-    return;
-  }
-  if (!Number.isSafeInteger(cobro.creadoEn)) {
+  const instante = instanteDeIngreso(cobro).en;
+  if (!Number.isSafeInteger(instante)) {
     return;
   }
 
-  const partes = partesEnZona(new Date(cobro.creadoEn));
+  const partes = partesEnZona(new Date(instante));
   const clave = `${String(partes.y).padStart(4, "0")}-${String(partes.m).padStart(2, "0")}-${String(partes.d).padStart(2, "0")}`;
   const previo = totales.get(clave);
   if (previo === undefined) {
@@ -92,4 +149,31 @@ function sumarSiCuenta(totales: Map<string, number>, cobro: CobroParaSerie): voi
     return;
   }
   totales.set(clave, suma);
+}
+
+function cuentaParaSerie(cobro: CobroParaSerie): boolean {
+  if (!ESTADOS_INGRESO.has(cobro.estado)) {
+    return false;
+  }
+  if (!Number.isSafeInteger(cobro.montoCentavos) || cobro.montoCentavos < 0) {
+    return false;
+  }
+  return Number.isSafeInteger(cobro.creadoEn);
+}
+
+function instanteDeIngreso(cobro: CobroParaSerie): { en: number; porCreacion: boolean } {
+  if (cobro.estado === "liberado" && esInstante(cobro.liberadoEn)) {
+    return { en: cobro.liberadoEn, porCreacion: false };
+  }
+  if (esInstante(cobro.verificadoEn)) {
+    return { en: cobro.verificadoEn, porCreacion: false };
+  }
+  if (esInstante(cobro.liberadoEn)) {
+    return { en: cobro.liberadoEn, porCreacion: false };
+  }
+  return { en: cobro.creadoEn, porCreacion: true };
+}
+
+function esInstante(valor: unknown): valor is number {
+  return typeof valor === "number" && Number.isSafeInteger(valor);
 }

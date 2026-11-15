@@ -1,6 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { COBROS_FIXTURE } from "../convex/_stub/fixtures";
+import { formatoMXN } from "../lib/formato";
 import { crearPuenteNombre, observarClienteNombre, responderNombre, type PuenteNombre } from "./rewriter-nombre";
 
 const NUBE = ["Plantillas", "Mostrador", "Plan", "Agente"] as const;
@@ -75,9 +77,15 @@ test("con nombre, /panel no redirige y muestra inicio, grafica, tarjetas y DEMO"
   await expect(page.getByText("Modo DEMO: estos cobros son de práctica y no se mueve dinero real.")).toBeVisible();
   await expect(page.getByText("DEMO", { exact: true }).first()).toBeVisible();
 
-  const grafica = page.getByRole("region", { name: "Ingresos de los últimos 7 días" });
+  const grafica = page.getByRole("region", { name: "Cobros liberados por día de creación" });
+  const esperado = expectativaPorCreacion();
   await expect(grafica).toBeVisible();
-  await expect(grafica).toContainText("Total de la semana:");
+  await expect(grafica).toContainText(`Suma por día de creación: ${formatoMXN(esperado.total)}`);
+  const dias = grafica.locator("li");
+  await expect(dias).toHaveCount(7);
+  for (const [indice, centavos] of esperado.centavos.entries()) {
+    await expect(dias.nth(indice)).toContainText(formatoMXN(centavos));
+  }
 
   for (const entrada of NUBE) {
     await expect(page.getByRole("link", { name: entrada, exact: true })).toHaveCount(0);
@@ -152,6 +160,51 @@ function visible(page: Page, texto: string) {
 
 function enlaceVisible(page: Page, nombre: string) {
   return page.getByRole("link", { name: nombre, exact: true }).filter({ visible: true });
+}
+
+const OFFSET_MEXICO_MS = 6 * 60 * 60 * 1000;
+
+function expectativaPorCreacion(): { centavos: number[]; total: number } {
+  const hoy = fechaMexico(Date.now());
+  const claves = Array.from({ length: 7 }, (_, indice) => claveDia(hoy, indice - 6));
+  const totales = new Map(claves.map((clave) => [clave, 0]));
+  sumarFixture(totales);
+  const centavos = claves.map((clave) => totales.get(clave) ?? 0);
+  return { centavos, total: centavos.reduce((suma, valor) => suma + valor, 0) };
+}
+
+function sumarFixture(totales: Map<string, number>): void {
+  for (const cobro of COBROS_FIXTURE) {
+    if (cobro.estado !== "pagado_verificado" && cobro.estado !== "liberado") {
+      continue;
+    }
+    const previo = totales.get(fechaMexico(cobro.creadoEn).clave);
+    if (previo === undefined) {
+      continue;
+    }
+    totales.set(fechaMexico(cobro.creadoEn).clave, previo + cobro.montoCentavos);
+  }
+}
+
+function fechaMexico(ms: number): { y: number; m: number; d: number; clave: string } {
+  const local = new Date(ms - OFFSET_MEXICO_MS);
+  const y = local.getUTCFullYear();
+  const m = local.getUTCMonth() + 1;
+  const d = local.getUTCDate();
+  return { y, m, d, clave: `${anio(y)}-${dos(m)}-${dos(d)}` };
+}
+
+function claveDia(hoy: { y: number; m: number; d: number }, delta: number): string {
+  const corrido = new Date(Date.UTC(hoy.y, hoy.m - 1, hoy.d + delta));
+  return `${anio(corrido.getUTCFullYear())}-${dos(corrido.getUTCMonth() + 1)}-${dos(corrido.getUTCDate())}`;
+}
+
+function anio(valor: number): string {
+  return String(valor).padStart(4, "0");
+}
+
+function dos(valor: number): string {
+  return String(valor).padStart(2, "0");
 }
 
 async function recorrerAlta(page: Page, carpeta: string, ancho: number): Promise<void> {

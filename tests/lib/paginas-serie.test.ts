@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { serieIngresos } from "../../lib/serie";
-import { juntarPaginas, textoSuma, MAX_PAGINAS_SERIE, TAMANO_PAGINA_SERIE } from "../../lib/paginas-serie";
+import { juntarPaginas, MAX_PAGINAS_SERIE, TAMANO_PAGINA_SERIE } from "../../lib/paginas-serie";
 
 const AHORA = new Date("2026-11-15T21:00:00.000Z");
 
@@ -40,7 +40,5 @@ describe("juntarPaginas", () => {
     expect(estado.filas).toHaveLength(TAMANO_PAGINA_SERIE * MAX_PAGINAS_SERIE);
     expect(estado.parcial).toBe(true);
     expect(estado.completo).toBe(true);
-    expect(textoSuma(true)).toEqual({ prefijo: "Suma de la muestra", aviso: "Datos parciales" });
-    expect(textoSuma(true).prefijo).not.toBe("Total de la semana");
   });
 });

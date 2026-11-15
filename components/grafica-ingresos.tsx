@@ -2,31 +2,23 @@
 
 import dynamic from "next/dynamic";
 import { formatoMXN } from "@/lib/formato";
-import type { DiaSerie } from "@/lib/serie";
+import type { DiaSerie, RotuloIngresos } from "@/lib/serie";
 
 const Barras = dynamic(() => import("@/components/barras-ingresos").then((mod) => mod.BarrasIngresos), {
   ssr: false,
 });
 
-export function GraficaIngresos({
-  serie,
-  prefijo,
-  aviso,
-}: {
-  serie: readonly DiaSerie[];
-  prefijo: string;
-  aviso: string | null;
-}) {
+export function GraficaIngresos({ serie, rotulo }: { serie: readonly DiaSerie[]; rotulo: RotuloIngresos }) {
   const total = serie.reduce((suma, dia) => suma + dia.centavos, 0);
   return (
-    <section aria-label="Ingresos de los últimos 7 días" className="flex min-w-0 flex-col gap-4">
-      <h2 className="font-display text-xl font-semibold text-ink">Ingresos de los últimos 7 días</h2>
+    <section aria-label={rotulo.titulo} className="flex min-w-0 flex-col gap-4">
+      <h2 className="font-display text-xl font-semibold text-ink">{rotulo.titulo}</h2>
       {total === 0 ? (
-        <p className="text-muted">Tus ingresos aparecerán aquí cuando cobres el primero.</p>
+        <p className="text-muted">Los cobros liberados aparecerán aquí cuando cobres el primero.</p>
       ) : (
         <Barras serie={serie} />
       )}
-      <ResumenSerie serie={serie} total={total} prefijo={prefijo} aviso={aviso} />
+      <ResumenSerie serie={serie} total={total} prefijo={rotulo.prefijo} aviso={rotulo.aviso} />
     </section>
   );
 }
