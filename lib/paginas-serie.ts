@@ -20,13 +20,6 @@ export function estadoPaginasVacio<T>(): EstadoPaginas<T> {
   return { filas: [], paginas: 0, parcial: false, cursor: null, completo: false, token: null };
 }
 
-export function textoSuma(parcial: boolean): { prefijo: string; aviso: string | null } {
-  if (parcial) {
-    return { prefijo: "Suma de la muestra", aviso: "Datos parciales" };
-  }
-  return { prefijo: "Total de la semana", aviso: null };
-}
-
 export function incorporarSiNueva<T>(estado: EstadoPaginas<T>, pagina: PaginaLista<T>): EstadoPaginas<T> {
   if (estado.completo) {
     return estado;

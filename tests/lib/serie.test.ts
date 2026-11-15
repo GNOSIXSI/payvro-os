@@ -1,9 +1,45 @@
 import { describe, expect, it } from "vitest";
-import { serieIngresos, type CobroParaSerie } from "../../lib/serie";
+import { agrupaPorCreacion, leerMarcas, rotuloIngresos, serieIngresos, type CobroParaSerie } from "../../lib/serie";
 
 const AHORA = new Date("2026-11-15T21:00:00.000Z");
 const AYER_2359_MEXICO = new Date("2026-11-15T05:59:00.000Z");
 const HOY_0030_MEXICO = new Date("2026-11-15T06:30:00.000Z");
+
+describe("rotuloIngresos", () => {
+  it("does not present creation-day buckets as daily income or a weekly total", () => {
+    expect(rotuloIngresos({ porCreacion: true, parcial: false })).toEqual({
+      titulo: "Cobros liberados por día de creación",
+      prefijo: "Suma por día de creación",
+      aviso: null,
+    });
+    expect(rotuloIngresos({ porCreacion: true, parcial: true })).toEqual({
+      titulo: "Cobros liberados por día de creación",
+      prefijo: "Suma por día de creación",
+      aviso: "Datos parciales",
+    });
+    expect(rotuloIngresos({ porCreacion: false, parcial: true }).prefijo).toBe("Suma de la muestra");
+    expect(rotuloIngresos({ porCreacion: false, parcial: true }).aviso).toBe("Datos parciales");
+    expect(rotuloIngresos({ porCreacion: false, parcial: false })).toEqual({
+      titulo: "Ingresos de los últimos 7 días",
+      prefijo: "Total de la semana",
+      aviso: null,
+    });
+  });
+});
+
+describe("agrupaPorCreacion", () => {
+  it("is true unless every counted cobro brings a verified or release timestamp", () => {
+    expect(agrupaPorCreacion([])).toBe(true);
+    expect(agrupaPorCreacion([cobro("liberado", 100, AHORA)])).toBe(true);
+    expect(
+      agrupaPorCreacion([
+        { estado: "liberado", montoCentavos: 100, creadoEn: AHORA.getTime(), verificadoEn: AHORA.getTime() },
+      ]),
+    ).toBe(false);
+    expect(leerMarcas({ creadoEn: 1 })).toEqual({});
+    expect(leerMarcas({ verificadoEn: 5, liberadoEn: 9.5 })).toEqual({ verificadoEn: 5 });
+  });
+});
 
 describe("serieIngresos", () => {
   it("returns seven Mexico City days when there are no cobros", () => {
@@ -55,6 +91,45 @@ describe("serieIngresos", () => {
 
     expect(serie.find((dia) => dia.clave === "2026-11-14")?.centavos).toBe(1_550);
     expect(serie.find((dia) => dia.clave === "2026-11-15")?.centavos).toBe(25);
+  });
+
+  it("puts a cobro paid after midnight on the verified day, not the creation day", () => {
+    const creado = new Date("2026-11-15T05:55:00.000Z");
+    const verificado = new Date("2026-11-15T06:05:00.000Z");
+    const serie = serieIngresos(
+      [
+        {
+          estado: "liberado",
+          montoCentavos: 14_900,
+          creadoEn: creado.getTime(),
+          verificadoEn: verificado.getTime(),
+        },
+      ],
+      AHORA,
+    );
+
+    expect(serie.find((dia) => dia.clave === "2026-11-15")?.centavos).toBe(14_900);
+    expect(serie.find((dia) => dia.clave === "2026-11-14")?.centavos).toBe(0);
+  });
+
+  it("uses the release timestamp when a liberated cobro has both marks", () => {
+    const creado = new Date("2026-11-15T05:55:00.000Z");
+    const liberado = new Date("2026-11-15T06:05:00.000Z");
+    const serie = serieIngresos(
+      [
+        {
+          estado: "liberado",
+          montoCentavos: 100,
+          creadoEn: creado.getTime(),
+          verificadoEn: creado.getTime(),
+          liberadoEn: liberado.getTime(),
+        },
+      ],
+      AHORA,
+    );
+
+    expect(serie.find((dia) => dia.clave === "2026-11-15")?.centavos).toBe(100);
+    expect(serie.find((dia) => dia.clave === "2026-11-14")?.centavos).toBe(0);
   });
 
   it("does not open an eighth day for a cobro older than the window", () => {

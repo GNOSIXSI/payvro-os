@@ -8,14 +8,13 @@ import { TablaCobros, type CobroLista } from "@/components/tabla-cobros";
 import { TarjetaResumen } from "@/components/tarjeta-resumen";
 import { Monto } from "@/components/monto";
 import { api } from "@/convex/_generated/api";
-import { serieIngresos } from "@/lib/serie";
+import { agrupaPorCreacion, leerMarcas, rotuloIngresos, serieIngresos } from "@/lib/serie";
 import { esEstadoCobro } from "@/lib/estados";
 import { HAY_CONVEX } from "@/lib/hay-convex";
 import {
   estadoPaginasVacio,
   incorporarSiNueva,
   TAMANO_PAGINA_SERIE,
-  textoSuma,
   type EstadoPaginas,
   type PaginaLista,
 } from "@/lib/paginas-serie";
@@ -31,7 +30,7 @@ export default function PanelPage() {
     return <p className="text-muted">Cargando cobros…</p>;
   }
 
-  const suma = textoSuma(serie.parcial);
+  const rotulo = rotuloIngresos({ porCreacion: agrupaPorCreacion(serie.filas), parcial: serie.parcial });
   const recientes = serie.filas.slice(0, TAMANO_PAGINA_SERIE);
 
   return (
@@ -42,7 +41,7 @@ export default function PanelPage() {
         <TarjetaResumen titulo="Por liberar" valor={resumenRemoto.porLiberar} />
         <TarjetaResumen titulo="En revisión" valor={resumenRemoto.enRevision} />
       </section>
-      <GraficaIngresos serie={serieIngresos(serie.filas)} prefijo={suma.prefijo} aviso={suma.aviso} />
+      <GraficaIngresos serie={serieIngresos(serie.filas)} rotulo={rotulo} />
       <section id="cobros" className="flex min-w-0 flex-col gap-4">
         <h2 className="font-display text-xl font-semibold text-ink">Cobros recientes</h2>
         <TablaCobros cobros={recientes} />
@@ -108,6 +107,7 @@ function cobrosDePagina(page: Array<{
       estado: fila.estado,
       alerta: fila.alerta,
       creadoEn: fila.creadoEn,
+      ...leerMarcas(fila),
     });
   }
   return filas;
