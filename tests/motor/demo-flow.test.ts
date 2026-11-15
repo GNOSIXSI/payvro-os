@@ -210,6 +210,150 @@ describe("persisted DEMO engine at the Convex caller boundary", () => {
     expect(estado.cobros.find((item) => item.publicId === cobro.publicId)).toMatchObject({ estado: "en_revision", motivoRevision: "parcial" });
   });
 
+  it("persists the payment that completes a partial link when the next read is paid", async () => {
+    const t = nuevoHarness();
+    const cobro = await t.mutation(api.cobros.crear, {
+      claveIdempotencia: "demo-partial-cierra-0001",
+      concepto: "Pedido de ejemplo",
+      montoCentavos: 14900,
+      tipo: "link",
+    });
+    await terminarTrabajos(t);
+    const initial = await leerEstado(t);
+    const intento = initial.intentos.find((item) => item.cobroId === initial.cobros.find((item) => item.publicId === cobro.publicId)?._id)!;
+    const pagada = {
+      transactionId: "cierra-paid-0001",
+      status: "PAID" as const,
+      amount: 149,
+      amountBreakdown: { base: 149, fee: 0, tip: 0 },
+      currency: "MXN",
+      paymentMethod: "CODI" as const,
+      payableType: "PAYMENT_LINK" as const,
+      payableId: intento.peyPayableId!,
+      dateCreated: "2026-11-14T11:00:00.000Z",
+      datePaid: "2026-11-14T11:01:00.000Z",
+      metadata: {},
+    };
+    const pendiente = {
+      ...pagada,
+      transactionId: "cierra-pending-0001",
+      status: "PENDING" as const,
+      datePaid: undefined,
+    };
+    const ajena = { ...pagada, transactionId: "cierra-other-payable-0001", payableId: "another-payable" };
+    const linkParcial = {
+      status: "partial" as const,
+      amount: 149,
+      clientReferenceId: intento.publicId,
+      metadata: {},
+      transactions: [{ transactionId: pagada.transactionId }, { transactionId: pendiente.transactionId }],
+    };
+
+    await expect(t.mutation(internal.motor.verificar.aplicarEvidencia, {
+      intentoId: intento._id,
+      origen: "sondeo",
+      evidencia: { link: linkParcial, transacciones: [pagada, pendiente, ajena] },
+    })).resolves.toEqual({ ok: true, resultado: "parcial" });
+
+    const pendientePagada = { ...pendiente, status: "PAID" as const, datePaid: "2026-11-14T11:02:00.000Z" };
+    const evidenciaCierre = {
+      link: { ...linkParcial, status: "paid" as const },
+      transacciones: [pagada, pendientePagada, ajena],
+    };
+    await expect(t.mutation(internal.motor.verificar.aplicarEvidencia, {
+      intentoId: intento._id,
+      origen: "sondeo",
+      evidencia: evidenciaCierre,
+    })).resolves.toEqual({ ok: true, resultado: "duplicado" });
+
+    let estado = await leerEstado(t);
+    expect(estado.pagos.map((pago) => pago.peyTransactionId).sort()).toEqual([pagada.transactionId, pendientePagada.transactionId].sort());
+    expect(estado.pagos.find((pago) => pago.peyTransactionId === pendientePagada.transactionId)?.resultado).toBe("duplicado");
+    expect(estado.cobros.find((item) => item.publicId === cobro.publicId)).toMatchObject({
+      estado: "en_revision",
+      motivoRevision: "parcial",
+    });
+    expect(estado.negocios[0]?.enRevisionCount).toBe(1);
+    expect(estado.bitacora.filter((entrada) => entrada.tipo === "cobro.en_revision")).toHaveLength(1);
+    expect(estado.bitacora.some((entrada) => entrada.tipo === "cobro.liberado" || entrada.tipo === "pago.verificado")).toBe(false);
+    expect(estado.bitacora.some((entrada) => entrada.tipo === "pago.no_coincide" && entrada.detalle.motivo === "duplicado")).toBe(true);
+
+    await expect(t.mutation(internal.motor.verificar.aplicarEvidencia, {
+      intentoId: intento._id,
+      origen: "sondeo",
+      evidencia: evidenciaCierre,
+    })).resolves.toEqual({ ok: true, resultado: "repetido" });
+
+    estado = await leerEstado(t);
+    expect(estado.pagos).toHaveLength(2);
+    expect(estado.cobros.find((item) => item.publicId === cobro.publicId)?.estado).toBe("en_revision");
+  });
+
+  it("persists a new counted payment while the cobro is already in review for another reason", async () => {
+    const t = nuevoHarness();
+    const cobro = await t.mutation(api.cobros.crear, {
+      claveIdempotencia: "demo-revision-otra-0001",
+      concepto: "Pedido de ejemplo",
+      montoCentavos: 14900,
+      tipo: "link",
+    });
+    await terminarTrabajos(t);
+    const initial = await leerEstado(t);
+    const intento = initial.intentos.find((item) => item.cobroId === initial.cobros.find((item) => item.publicId === cobro.publicId)?._id)!;
+    const distinta = {
+      transactionId: "revision-distinta-0001",
+      status: "PAID" as const,
+      amount: 150,
+      amountBreakdown: { base: 150, fee: 0, tip: 0 },
+      currency: "MXN",
+      paymentMethod: "CODI" as const,
+      payableType: "PAYMENT_LINK" as const,
+      payableId: intento.peyPayableId!,
+      dateCreated: "2026-11-14T11:00:00.000Z",
+      datePaid: "2026-11-14T11:01:00.000Z",
+      metadata: {},
+    };
+    const link = {
+      status: "paid" as const,
+      amount: 149,
+      clientReferenceId: intento.publicId,
+      metadata: {},
+      transactions: [{ transactionId: distinta.transactionId }],
+    };
+    await expect(t.mutation(internal.motor.verificar.aplicarEvidencia, {
+      intentoId: intento._id,
+      origen: "sondeo",
+      evidencia: { link, transacciones: [distinta] },
+    })).resolves.toEqual({ ok: true, resultado: "monto_distinto" });
+
+    const exacta = {
+      ...distinta,
+      transactionId: "revision-exacta-0001",
+      amount: 149,
+      amountBreakdown: { base: 149, fee: 0, tip: 0 },
+      datePaid: "2026-11-14T11:03:00.000Z",
+    };
+    await expect(t.mutation(internal.motor.verificar.aplicarEvidencia, {
+      intentoId: intento._id,
+      origen: "sondeo",
+      evidencia: {
+        link: {
+          ...link,
+          transactions: [{ transactionId: distinta.transactionId }, { transactionId: exacta.transactionId }],
+        },
+        transacciones: [distinta, exacta],
+      },
+    })).resolves.toEqual({ ok: true, resultado: "duplicado" });
+
+    const estado = await leerEstado(t);
+    expect(estado.pagos.map((pago) => pago.peyTransactionId).sort()).toEqual([distinta.transactionId, exacta.transactionId].sort());
+    expect(estado.cobros.find((item) => item.publicId === cobro.publicId)).toMatchObject({
+      estado: "en_revision",
+      motivoRevision: "monto_distinto",
+    });
+    expect(estado.bitacora.some((entrada) => entrada.tipo === "cobro.liberado")).toBe(false);
+  });
+
   it("holds a mismatched amount for review rather than releasing", async () => {
     const t = nuevoHarness();
     const cobro = await crearCobro(t, "demo-monto-distinto-0001");
