@@ -1,0 +1,219 @@
+import { ConvexError, v } from "convex/values";
+import { internal } from "../_generated/api";
+import { internalAction, internalMutation, internalQuery } from "../_generated/server";
+import type { Id } from "../_generated/dataModel";
+import { aCentavos, evaluar, transicionarCobro, transicionarIntento } from "@payvro/engine";
+import type { Evidencia, EvidenciaLink, TransaccionPey } from "@payvro/engine";
+import { nuevoId } from "@payvro/engine/ids";
+import { registrar } from "./bitacora";
+import { crearPeyPuerto } from "./peyPuerto";
+import { liberar } from "./liberar";
+
+const estadoCobroValidator = v.union(
+  v.literal("borrador"), v.literal("esperando_pago"), v.literal("pagado_verificado"),
+  v.literal("liberado"), v.literal("expirado"), v.literal("cancelado"), v.literal("en_revision"),
+);
+const txValidator = v.object({
+  transactionId: v.string(), status: v.union(v.literal("PENDING"), v.literal("PAID")), amount: v.number(),
+  amountBreakdown: v.object({ base: v.number(), tip: v.number(), fee: v.number() }), currency: v.string(),
+  paymentMethod: v.union(v.literal("CARD"), v.literal("CODI")),
+  payableType: v.union(v.literal("PAYMENT_LINK"), v.literal("API_CODI_QR"), v.literal("API_CODI_PN")),
+  payableId: v.string(), dateCreated: v.string(), datePaid: v.optional(v.string()), metadata: v.record(v.string(), v.string()),
+});
+const linkValidator = v.object({
+  status: v.union(v.literal("pending"), v.literal("processing"), v.literal("paid"), v.literal("partial")),
+  amount: v.number(), clientReferenceId: v.string(), metadata: v.record(v.string(), v.string()),
+  transactions: v.array(v.object({ transactionId: v.string() })),
+});
+const origenValidator = v.union(v.literal("simulador"), v.literal("sondeo"), v.literal("barrido"), v.literal("webhook"));
+type ResultadoPago = "coincide" | "monto_distinto" | "destino_distinto" | "metodo_no_permitido" | "con_propina" | "duplicado" | "pago_tardio" | "parcial";
+
+function centavosDeComponente(pesos: number): number {
+  return pesos === 0 ? 0 : aCentavos(pesos);
+}
+
+export const datosIntento = internalQuery({
+  args: { intentoId: v.id("intentos") },
+  returns: v.union(v.null(), v.object({
+    intentoId: v.id("intentos"), negocioId: v.id("negocios"), modo: v.union(v.literal("demo"), v.literal("live")),
+    publicId: v.string(), tipo: v.union(v.literal("link"), v.literal("qr")), estado: v.string(),
+    peyPayableId: v.union(v.string(), v.null()), destino: v.union(v.literal("cuenta_de_la_llave"), v.literal("bank_account_id")),
+    cobroId: v.id("cobros"), cobroPublicId: v.string(), montoCentavos: v.number(), estadoCobro: estadoCobroValidator,
+    expiraEn: v.number(), modoNegocio: v.union(v.literal("demo"), v.literal("live")),
+  })),
+  handler: async (ctx, args) => {
+    const intento = await ctx.db.get(args.intentoId);
+    if (!intento) return null;
+    const cobro = await ctx.db.get(intento.cobroId);
+    const negocio = await ctx.db.get(intento.negocioId);
+    if (!cobro || !negocio || cobro.negocioId !== negocio._id || intento.negocioId !== negocio._id) return null;
+    return {
+      intentoId: intento._id, negocioId: negocio._id, modo: intento.modo, publicId: intento.publicId,
+      tipo: intento.tipo, estado: intento.estado, peyPayableId: intento.peyPayableId ?? null,
+      destino: intento.destino, cobroId: cobro._id, cobroPublicId: cobro.publicId,
+      montoCentavos: cobro.montoCentavos, estadoCobro: cobro.estado, expiraEn: cobro.expiraEn, modoNegocio: negocio.modo,
+    };
+  },
+});
+
+export const aplicarEvidencia = internalMutation({
+  args: {
+    intentoId: v.id("intentos"), evidencia: v.object({
+      transacciones: v.array(txValidator), link: v.optional(linkValidator), destinoConfirmado: v.optional(v.boolean()),
+    }), origen: origenValidator,
+  },
+  returns: v.object({ ok: v.boolean(), resultado: v.string() }),
+  handler: async (ctx, args) => {
+    const intento = await ctx.db.get(args.intentoId);
+    const cobro = intento ? await ctx.db.get(intento.cobroId) : null;
+    const negocio = intento ? await ctx.db.get(intento.negocioId) : null;
+    if (!intento || !cobro || !negocio || intento.negocioId !== cobro.negocioId || cobro.negocioId !== negocio._id || intento.modo !== cobro.modo || cobro.modo !== negocio.modo) {
+      throw new ConvexError({ codigo: "NO_ENCONTRADO", mensaje: "No se encontró el intento." });
+    }
+    if (!intento.peyPayableId) return { ok: true, resultado: "sin_pago" };
+    const evidencia = args.evidencia as Evidencia;
+    const veredicto = evaluar({
+      tipo: intento.tipo, peyPayableId: intento.peyPayableId, intentoPublicId: intento.publicId,
+      montoCentavos: intento.montoCentavos, destino: intento.destino,
+    }, evidencia);
+    if (veredicto.resultado === "sin_pago") return { ok: true, resultado: "sin_pago" };
+    const pagadas = veredicto.transacciones;
+    const nuevas: TransaccionPey[] = [];
+    for (const transaccion of pagadas) {
+      const reclamo = await ctx.db.query("pagos").withIndex("by_peyTransactionId", (q) => q.eq("peyTransactionId", transaccion.transactionId)).unique();
+      if (reclamo && reclamo.cobroId !== cobro._id) {
+        throw new ConvexError({ codigo: "CLAVE_REUTILIZADA", mensaje: "La transacción ya está ligada a otro cobro." });
+      }
+      if (!reclamo) nuevas.push(transaccion);
+    }
+    if (nuevas.length === 0) return { ok: true, resultado: "repetido" };
+    const ahora = Date.now();
+    const tardio = cobro.estado === "expirado" || cobro.estado === "cancelado";
+    const liberado = cobro.estado === "liberado" || cobro.liberadoEn !== undefined;
+    let resultadoPago: ResultadoPago = veredicto.resultado === "coincide" ? "coincide" : veredicto.motivo;
+    if (tardio) resultadoPago = "pago_tardio";
+    if (liberado) resultadoPago = "duplicado";
+    const pagosInsertados: Id<"pagos">[] = [];
+    let nuevasBaseCentavos = 0;
+    for (const transaccion of nuevas) {
+      let baseCentavos: number;
+      let feeCentavos: number;
+      let tipCentavos: number;
+      let totalCentavos: number;
+      let pagadoEn: number;
+      try {
+        baseCentavos = aCentavos(transaccion.amountBreakdown.base);
+        feeCentavos = centavosDeComponente(transaccion.amountBreakdown.fee);
+        tipCentavos = centavosDeComponente(transaccion.amountBreakdown.tip);
+        totalCentavos = aCentavos(transaccion.amount);
+        pagadoEn = transaccion.datePaid ? Date.parse(transaccion.datePaid) : Number.NaN;
+      } catch {
+        throw new ConvexError({ codigo: "MONTO_INVALIDO", mensaje: "La evidencia tiene un monto inválido." });
+      }
+      if (!Number.isFinite(pagadoEn)) throw new ConvexError({ codigo: "TRANSICION_INVALIDA", mensaje: "La evidencia no incluye una fecha de pago válida." });
+      nuevasBaseCentavos += baseCentavos;
+      const pagoId = await ctx.db.insert("pagos", {
+        negocioId: negocio._id, modo: negocio.modo, publicId: nuevoId("pag_"), cobroId: cobro._id,
+        intentoId: intento._id, peyTransactionId: transaccion.transactionId, payableType: transaccion.payableType,
+        payableId: transaccion.payableId, metodo: transaccion.paymentMethod, baseCentavos, feeCentavos,
+        tipCentavos, totalCentavos, pagadoEn, ...(transaccion.metadata.trackingKey ? { claveRastreo: transaccion.metadata.trackingKey } : {}),
+        resultado: resultadoPago, verificadoEn: ahora,
+      });
+      pagosInsertados.push(pagoId);
+    }
+    if (liberado) {
+      await ctx.db.patch(cobro._id, { alerta: "pago_duplicado", actualizadoEn: ahora });
+      for (const pagoId of pagosInsertados) {
+        await registrar(ctx, {
+          negocioId: negocio._id, modo: negocio.modo, tipo: "pago.duplicado", cobroId: cobro._id,
+          intentoId: intento._id, pagoId, actor: { tipo: "pey" }, detalle: { motivo: "duplicado" }, en: ahora,
+        });
+      }
+      return { ok: true, resultado: "duplicado" };
+    }
+    if (tardio) {
+      const nuevoEstado = transicionarCobro(cobro.estado, "pago_tardio");
+      const pagoId = pagosInsertados[0];
+      await ctx.db.patch(cobro._id, { estado: nuevoEstado, motivoRevision: "pago_tardio", pagoId, verificadoEn: ahora, actualizadoEn: ahora });
+      await ctx.db.patch(negocio._id, { enRevisionCount: (negocio.enRevisionCount ?? 0) + 1 });
+      await registrar(ctx, {
+        negocioId: negocio._id, modo: negocio.modo, tipo: "pago.no_coincide", cobroId: cobro._id,
+        intentoId: intento._id, pagoId, actor: { tipo: "pey" }, detalle: { motivo: "pago_tardio" }, en: ahora,
+      });
+      await registrar(ctx, {
+        negocioId: negocio._id, modo: negocio.modo, tipo: "cobro.en_revision", cobroId: cobro._id,
+        intentoId: intento._id, pagoId, actor: { tipo: "sistema" }, estadoAntes: cobro.estado,
+        estadoDespues: nuevoEstado, detalle: { motivo: "pago_tardio" }, en: ahora,
+      });
+      return { ok: true, resultado: "pago_tardio" };
+    }
+    if (cobro.estado === "esperando_pago" && veredicto.resultado === "coincide") {
+      const pagoId = pagosInsertados[0];
+      const nuevoEstado = transicionarCobro(cobro.estado, "coincide");
+      await ctx.db.patch(cobro._id, { estado: nuevoEstado, pagoId, verificadoEn: ahora, actualizadoEn: ahora });
+      const inicioDia = Date.UTC(new Date(ahora).getUTCFullYear(), new Date(ahora).getUTCMonth(), new Date(ahora).getUTCDate());
+      const verificadoHoyCentavos = (negocio.verificadoHoyDia === inicioDia ? negocio.verificadoHoyCentavos ?? 0 : 0) + nuevasBaseCentavos;
+      await ctx.db.patch(negocio._id, { verificadoHoyDia: inicioDia, verificadoHoyCentavos });
+      if (intento.estado === "creado") await ctx.db.patch(intento._id, { estado: transicionarIntento(intento.estado, "pagar") });
+      await registrar(ctx, {
+        negocioId: negocio._id, modo: negocio.modo, tipo: "pago.verificado", cobroId: cobro._id,
+        intentoId: intento._id, pagoId, actor: { tipo: "pey" }, estadoAntes: cobro.estado,
+        estadoDespues: nuevoEstado, detalle: {}, en: ahora,
+      });
+      await liberar(ctx, { ...cobro, estado: nuevoEstado, pagoId, verificadoEn: ahora, actualizadoEn: ahora }, negocio, { tipo: "sistema" }, ahora);
+      return { ok: true, resultado: "coincide" };
+    }
+    if (cobro.estado === "esperando_pago") {
+      const motivo = veredicto.resultado === "revisar" ? veredicto.motivo : "duplicado";
+      const nuevoEstado = transicionarCobro(cobro.estado, "revisar");
+      const pagoId = pagosInsertados[0];
+      await ctx.db.patch(cobro._id, { estado: nuevoEstado, motivoRevision: motivo, pagoId, verificadoEn: ahora, actualizadoEn: ahora });
+      await ctx.db.patch(negocio._id, { enRevisionCount: (negocio.enRevisionCount ?? 0) + 1 });
+      await registrar(ctx, {
+        negocioId: negocio._id, modo: negocio.modo, tipo: "pago.no_coincide", cobroId: cobro._id,
+        intentoId: intento._id, pagoId, actor: { tipo: "pey" }, detalle: { motivo }, en: ahora,
+      });
+      await registrar(ctx, {
+        negocioId: negocio._id, modo: negocio.modo, tipo: "cobro.en_revision", cobroId: cobro._id,
+        intentoId: intento._id, pagoId, actor: { tipo: "sistema" }, estadoAntes: cobro.estado,
+        estadoDespues: nuevoEstado, detalle: { motivo }, en: ahora,
+      });
+      return { ok: true, resultado: motivo };
+    }
+    throw new ConvexError({ codigo: "TRANSICION_INVALIDA", mensaje: "El cobro no admite aplicar esta evidencia." });
+  },
+});
+
+export const verificarIntento = internalAction({
+  args: { intentoId: v.id("intentos"), origen: origenValidator },
+  returns: v.object({ ok: v.boolean(), resultado: v.string() }),
+  handler: async (ctx, args): Promise<{ ok: boolean; resultado: string }> => {
+    const modoConfigurado = await ctx.runQuery(internal.puertos.modoDeployment, {});
+    const datos = await ctx.runQuery(internal.motor.verificar.datosIntento, { intentoId: args.intentoId });
+    if (!datos || !datos.peyPayableId || datos.modo !== datos.modoNegocio) return { ok: false, resultado: "sin_pago" };
+    if (datos.modo !== modoConfigurado) throw new ConvexError({ codigo: "MODO_INVALIDO", mensaje: "El modo del intento no coincide con la instalación." });
+    if (datos.estado !== "creado" && datos.estado !== "descartado" && datos.estado !== "pagado") return { ok: false, resultado: "sin_pago" };
+    const puerto = crearPeyPuerto(ctx, datos.negocioId, datos.modo);
+    let link: EvidenciaLink | undefined;
+    const transacciones: TransaccionPey[] = [];
+    if (datos.tipo === "link") {
+      link = await puerto.leerLink(datos.peyPayableId);
+      for (const transaccion of link.transactions) transacciones.push(await puerto.leerTransaccion(transaccion.transactionId));
+    } else {
+      let token: string | undefined;
+      do {
+        const pagina = await puerto.listarTransaccionesQr(datos.peyPayableId, token);
+        for (const transaccion of pagina.transactions) transacciones.push(await puerto.leerTransaccion(transaccion.transactionId));
+        token = pagina.nextToken;
+      } while (token && transacciones.length < 1000);
+      if (token) throw new ConvexError({ codigo: "TRANSICION_INVALIDA", mensaje: "La evidencia excede el límite de verificación." });
+    }
+    const destinoConfirmado = datos.tipo === "qr" && datos.destino === "bank_account_id";
+    const evidencia: Evidencia = {
+      transacciones,
+      ...(link ? { link } : {}),
+      ...(datos.tipo === "qr" ? { destinoConfirmado } : {}),
+    };
+    return await ctx.runMutation(internal.motor.verificar.aplicarEvidencia, { intentoId: args.intentoId, evidencia, origen: args.origen });
+  },
+});
