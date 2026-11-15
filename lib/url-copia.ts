@@ -38,7 +38,7 @@ function armarDestino(
   ubicacion: UbicacionCopia,
 ): DestinoCopia {
   const esLocal = ubicacion.hostname === "localhost" || ubicacion.hostname === "127.0.0.1";
-  if (ubicacion.protocol === "https:" && !esLocal) {
+  if ((ubicacion.protocol === "https:" && !esLocal) || (esLocal && !urlPago)) {
     return {
       disponible: true,
       etiqueta: "Copiar link",

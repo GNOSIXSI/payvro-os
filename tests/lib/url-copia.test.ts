@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { destinoDeCopia } from "../../lib/url-copia";
 
-const AVISO = "El link de pago aún no está disponible";
 const COBRO = "cob_00000000000000000000000000";
 
 function conUbicacion(ubicacion: { protocol: string; hostname: string; origin: string }) {
@@ -44,7 +43,7 @@ describe("destinoDeCopia", () => {
   });
 
   it.each(["localhost", "127.0.0.1"])(
-    "does not copy a %s link when urlPago is missing",
+    "copies the local payer page on %s when urlPago is missing",
     (hostname) => {
       conUbicacion({
         protocol: "http:",
@@ -52,8 +51,9 @@ describe("destinoDeCopia", () => {
         origin: `http://${hostname}:3000`,
       });
       expect(destinoDeCopia(COBRO, undefined)).toEqual({
-        disponible: false,
-        aviso: AVISO,
+        disponible: true,
+        etiqueta: "Copiar link",
+        texto: `http://${hostname}:3000/pagar/${COBRO}`,
       });
     },
   );
