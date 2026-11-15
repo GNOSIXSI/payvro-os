@@ -200,6 +200,7 @@ describe("LIVE pey QR client", () => {
     const { pey, llamadas } = cliente([{ status: 200, body: transaccionesCuenta }]);
     const pagina = await pey.listarTransaccionesCuenta("token&nextToken=evil/#?");
     expect(pagina.transactions).toHaveLength(1);
+    expect(pagina.descartadas).toBe(1);
     expect(pagina.transactions[0]).toMatchObject({ transactionId: TX_ID, payableId: QR_ID, payableType: "API_CODI_QR" });
     expect(pagina.nextToken).toBeNull();
     const url = new URL(llamadas[0].url);
