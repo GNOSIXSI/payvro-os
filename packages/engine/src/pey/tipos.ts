@@ -37,6 +37,8 @@ export interface PaginaReferenciasTransacciones {
 export interface PaginaTransacciones {
   transactions: TransaccionPey[];
   nextToken: string | null;
+  /** Rows skipped because the payable shape was not recognized. Zero means every row was readable. */
+  descartadas: number;
 }
 
 export interface TransaccionPeyWire {

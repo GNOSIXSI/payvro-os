@@ -171,15 +171,17 @@ export function normalizarPaginaReferencias(value: unknown): PaginaReferenciasTr
 export function normalizarPaginaTransacciones(value: unknown): PaginaTransacciones {
   const { items, nextToken } = pageParts(value);
   const transactions: TransaccionPey[] = [];
+  let descartadas = 0;
   for (const item of items) {
     try {
       identidadPayable(item);
     } catch {
+      descartadas += 1;
       continue;
     }
     transactions.push(normalizarTransaccionPey(item));
   }
-  return { transactions, nextToken };
+  return { transactions, nextToken, descartadas };
 }
 
 export function normalizarRespuestaQr(value: unknown): { id: string; qrString: string } {
