@@ -6,6 +6,7 @@ useDefault = true
 # never leaves the machine). `gitleaks dir .` also reads ignored files, so without
 # this every close fails on a file git never sees. Only that folder is exempt:
 # a secret in .env.local or any other path is still reported.
-[[allowlists]]
+# `[allowlist]` (singular) is read by every gitleaks 8.x; `[[allowlists]]` only by recent ones.
+[allowlist]
 description = "local Convex backend state (gitignored)"
 paths = ['''(^|/)\.convex/''']
