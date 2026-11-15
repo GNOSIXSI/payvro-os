@@ -49,7 +49,12 @@ export async function crearCobro(
   }
   const existente = await ctx.db.query("cobros").withIndex("by_negocio_clave", (q) => q.eq("negocioId", negocioId).eq("claveIdempotencia", entrada.claveIdempotencia)).unique();
   if (existente) {
-    if (existente.concepto !== entrada.concepto || existente.montoCentavos !== entrada.montoCentavos || (existente.tipoInicial ?? tipo) !== tipo) {
+    let tipoExistente = existente.tipoInicial;
+    if (!tipoExistente && existente.intentoActivoId) {
+      const intentoOriginal = await ctx.db.get(existente.intentoActivoId);
+      if (intentoOriginal?.cobroId === existente._id) tipoExistente = intentoOriginal.tipo;
+    }
+    if (existente.concepto !== entrada.concepto || existente.montoCentavos !== entrada.montoCentavos || tipoExistente !== tipo) {
       throw new ConvexError({ codigo: "CLAVE_REUTILIZADA", mensaje: "La clave ya se usó con otros datos." });
     }
     return { publicId: existente.publicId, folio: existente.folio, estado: existente.estado };
