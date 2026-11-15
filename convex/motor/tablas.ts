@@ -10,6 +10,10 @@ const intentoEstado = v.union(
   v.literal("reservado"), v.literal("creado"), v.literal("pagado"),
   v.literal("incierto"), v.literal("fallido"), v.literal("descartado"),
 );
+const estadoCuentaPey = v.union(
+  v.literal("ACTIVE"), v.literal("PENDING"), v.literal("PROCESSING"), v.literal("ERROR"),
+  v.literal("CONFIGURACION_AUSENTE"), v.literal("NO_DISPONIBLE"),
+);
 const detalleBitacora = v.object({
   folio: v.optional(v.number()),
   montoCentavos: v.optional(v.number()),
@@ -31,6 +35,7 @@ export const tablasMotor = {
     cobrosPausados: v.boolean(), folioSiguiente: v.number(), seqBitacora: v.number(),
     ultimoTxVisto: v.optional(v.string()), enRevisionCount: v.optional(v.number()),
     verificadoHoyDia: v.optional(v.number()), verificadoHoyCentavos: v.optional(v.number()),
+    estadoCuentaPey: v.optional(estadoCuentaPey), cuentaRevisadaEn: v.optional(v.number()),
   }).index("by_publicId", ["publicId"]).index("by_modo", ["modo"]),
   cobros: defineTable({
     negocioId: v.id("negocios"), modo, publicId: v.string(), folio: v.number(), plantilla: v.string(),
@@ -54,7 +59,10 @@ export const tablasMotor = {
     peyPayableId: v.optional(v.string()), urlPago: v.optional(v.string()), qrString: v.optional(v.string()),
     destino: v.union(v.literal("cuenta_de_la_llave"), v.literal("bank_account_id")),
     vigiladoHasta: v.optional(v.number()), sondeoActivo: v.boolean(), sondeos: v.number(),
-    ultimaVerificacionEn: v.optional(v.number()), claveIdempotencia: v.string(), creadoEn: v.number(),
+    sondeoInicioEn: v.optional(v.number()), sondeoLeaseHasta: v.optional(v.number()),
+    sondeoLeaseId: v.optional(v.string()), sondeoBackoffMs: v.optional(v.number()),
+    ultimaVerificacionEn: v.optional(v.number()), barridoActivo: v.optional(v.boolean()),
+    siguienteBarridoEn: v.optional(v.number()), claveIdempotencia: v.string(), creadoEn: v.number(),
     postIniciadoEn: v.optional(v.number()), inciertoEn: v.optional(v.number()),
   })
     .index("by_publicId", ["publicId"])
@@ -62,6 +70,7 @@ export const tablasMotor = {
     .index("by_peyPayableId", ["peyPayableId"])
     .index("by_negocio_estado", ["negocioId", "estado"])
     .index("by_negocio_creadoEn", ["negocioId", "creadoEn"])
+    .index("by_modo_estado_barridoEn", ["modo", "estado", "barridoActivo", "siguienteBarridoEn", "creadoEn"])
     .index("by_negocio_clave", ["negocioId", "claveIdempotencia"]),
   pagos: defineTable({
     negocioId: v.id("negocios"), modo, publicId: v.string(), cobroId: v.id("cobros"), intentoId: v.id("intentos"),

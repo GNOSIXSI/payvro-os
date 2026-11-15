@@ -21,8 +21,10 @@ describe("DEMO pey simulator", () => {
     if (created.tipo !== "creado") return;
     await simulator.pagar(created.peyPayableId, "exacto");
     const listed = await simulator.listarTransaccionesQr(created.peyPayableId);
-    expect(listed.transactions).toHaveLength(1);
-    expect(listed.transactions[0]).toMatchObject({ status: "PAID", amount: 149, amountBreakdown: { base: 149, fee: 0, tip: 0 }, currency: "MXN", paymentMethod: "CODI", payableType: "API_CODI_QR" });
+    expect(listed).toEqual({ transactions: [{ transactionId: expect.any(String) }], nextToken: null });
+    const transaction = await simulator.leerTransaccion(listed.transactions[0].transactionId);
+    expect(transaction).toMatchObject({ status: "PAID", amount: 149, amountBreakdown: { base: 149, fee: 0, tip: 0 }, currency: "MXN", paymentMethod: "CODI", payableType: "API_CODI_QR" });
+    await expect(simulator.listarTransaccionesCuenta()).resolves.toMatchObject({ transactions: [transaction], nextToken: null });
   });
   it("keeps the mismatch variant valid and different for a one-centavo charge", async () => {
     const simulator = crearSimulador(store());
@@ -30,8 +32,10 @@ describe("DEMO pey simulator", () => {
     if (created.tipo !== "creado") throw new Error("expected payable");
     await simulator.pagar(created.peyPayableId, "monto_distinto");
     const rows = await simulator.listarTransaccionesQr(created.peyPayableId);
-    expect(rows.transactions[0].amountBreakdown.base).toBe(1.01);
-    expect(rows.transactions[0].amount).toBe(1.01);
+    expect(rows.transactions).toHaveLength(1);
+    const transaction = await simulator.leerTransaccion(rows.transactions[0].transactionId);
+    expect(transaction.amountBreakdown.base).toBe(1.01);
+    expect(transaction.amount).toBe(1.01);
   });
   it("replays a variant idempotently while allowing a distinct duplicate-payment event", async () => {
     const simulator = crearSimulador(store());
@@ -51,8 +55,9 @@ describe("DEMO pey simulator", () => {
       await simulator.pagar(created.peyPayableId, variant);
       const rows = await simulator.listarTransaccionesQr(created.peyPayableId);
       expect(rows.transactions.length).toBe(variant === "duplicado" ? 2 : 1);
-      expect(rows.transactions[0].amountBreakdown.base).toBe(expected);
-      if (variant === "tarjeta") expect(rows.transactions[0].paymentMethod).toBe("CARD");
+      const transaction = await simulator.leerTransaccion(rows.transactions[0].transactionId);
+      expect(transaction.amountBreakdown.base).toBe(expected);
+      if (variant === "tarjeta") expect(transaction.paymentMethod).toBe("CARD");
     }
   });
 });
