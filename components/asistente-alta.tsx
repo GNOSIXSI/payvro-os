@@ -9,6 +9,7 @@ import {
   GIROS_ALTA,
   PERFIL_OMITIDO,
   decidirAlta,
+  debeSalirDeBienvenida,
   guardarAltaLocal,
   seguirTrasFallo,
   useFotoAlta,
@@ -36,10 +37,16 @@ export function AsistenteAlta() {
   });
 
   useEffect(() => {
-    if (foto.lista && !decision.mostrarAsistente) {
+    if (
+      debeSalirDeBienvenida({
+        lista: foto.lista,
+        esperandoPerfil: HAY_CONVEX && negocio === undefined,
+        mostrarAsistente: decision.mostrarAsistente,
+      })
+    ) {
       router.replace("/panel");
     }
-  }, [foto.lista, decision.mostrarAsistente, router]);
+  }, [foto.lista, negocio, decision.mostrarAsistente, router]);
 
   if (!foto.lista || (HAY_CONVEX && negocio === undefined)) {
     return <p className="p-6 text-muted">Cargando…</p>;

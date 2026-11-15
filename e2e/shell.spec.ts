@@ -134,7 +134,10 @@ function totalSemana(): string {
 }
 
 async function recorrerAlta(page: Page, carpeta: string, ancho: number): Promise<void> {
-  await page.goto("/bienvenida");
+  await page.goto("/panel");
+  await page.evaluate(() => sessionStorage.removeItem("payvro.alta"));
+  await page.reload();
+  await expect(page).toHaveURL(/\/bienvenida$/);
   await expect(page.getByRole("heading", { name: "Cuenta" })).toBeVisible();
   await expect.poll(() => anchoDeScroll(page)).toBeLessThanOrEqual(ancho + 1);
   await page.screenshot({ path: path.join(carpeta, `bienvenida-cuenta-${ancho}.png`), fullPage: true });

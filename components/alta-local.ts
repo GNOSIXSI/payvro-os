@@ -59,6 +59,17 @@ export function seguirTrasFallo(bloquearSiFalla: boolean, fallo: unknown): boole
   return codigoDeFallo(fallo) === "NO_IMPLEMENTADO";
 }
 
+export function debeSalirDeBienvenida(entrada: {
+  lista: boolean;
+  esperandoPerfil: boolean;
+  mostrarAsistente: boolean;
+}): boolean {
+  if (!entrada.lista || entrada.esperandoPerfil) {
+    return false;
+  }
+  return !entrada.mostrarAsistente;
+}
+
 export function interpretarAlta(crudo: string | null): AltaLocal | null {
   if (crudo === null) {
     return null;
