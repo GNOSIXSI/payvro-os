@@ -62,7 +62,7 @@ export async function resolverNegocioEscritura(ctx: MutationCtx): Promise<Resolu
   if (!negocio && modoInstalacion === "demo") {
     const id: Id<"negocios"> = await ctx.db.insert("negocios", {
       publicId: nuevoId("neg_"),
-      nombre: "Dulces Ana — Ejemplo",
+      nombre: "",
       giro: "social",
       colorMarca: "#076B76",
       modo: "demo",

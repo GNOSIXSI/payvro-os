@@ -27,6 +27,18 @@ export const obtener = query({
   },
 });
 
+export const preparar = mutation({
+  args: {},
+  returns: v.object({ ok: v.boolean() }),
+  handler: async (ctx) => {
+    const { modo: modoResuelto } = await resolverNegocioEscritura(ctx);
+    if (modoResuelto !== "demo") {
+      throw new ConvexError({ codigo: "SOLO_DEMO", mensaje: "La preparación automática solo existe en DEMO." });
+    }
+    return { ok: true };
+  },
+});
+
 export const actualizarPerfil = mutation({
   args: { nombre: v.string(), giro, colorMarca },
   returns: v.object({ ok: v.boolean() }),

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { entrarAlPanel } from "./entrar-panel";
 
 test("de /panel a Liberado contra el motor, en DEMO", async ({ page, context }) => {
   test.setTimeout(90_000);
@@ -6,7 +7,7 @@ test("de /panel a Liberado contra el motor, en DEMO", async ({ page, context }) 
     origin: "http://127.0.0.1:3105",
   });
 
-  await page.goto("/panel");
+  await entrarAlPanel(page);
   await expect(demo(page)).toBeVisible();
   await page.getByRole("link", { name: "Nuevo cobro", exact: true }).filter({ visible: true }).first().click();
   await expect(page).toHaveURL(/\/panel\/nuevo$/);
