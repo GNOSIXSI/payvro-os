@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decidirAlta, interpretarAlta, PERFIL_OMITIDO } from "../../components/alta-local";
+import { decidirAlta, interpretarAlta, PERFIL_OMITIDO, seguirTrasFallo } from "../../components/alta-local";
 
 const DEMO = "Dulces Ana — Ejemplo";
 const GUARDADO = {
@@ -21,11 +21,23 @@ describe("decidirAlta", () => {
     expect(decision.nombre).toBe("Dulces Ana — Ejemplo");
   });
 
-  it("opens the assistant when Convex has no name, even if this browser saved one", () => {
+  it("keeps a finished profile when Convex still has no name", () => {
     const decision = decidirAlta({
       hayConvex: true,
       nombreRemoto: "  ",
       altaLocal: GUARDADO,
+      nombreDemo: DEMO,
+    });
+
+    expect(decision.mostrarAsistente).toBe(false);
+    expect(decision.nombre).toBe("Negocio de ejemplo");
+  });
+
+  it("opens the assistant when Convex has no name and this browser has not finished", () => {
+    const decision = decidirAlta({
+      hayConvex: true,
+      nombreRemoto: "",
+      altaLocal: "pendiente",
       nombreDemo: DEMO,
     });
 
@@ -93,6 +105,18 @@ describe("decidirAlta", () => {
     expect(PERFIL_OMITIDO.nombre.length).toBeLessThanOrEqual(40);
     expect(decision.mostrarAsistente).toBe(false);
     expect(decision.nombre).toBe(PERFIL_OMITIDO.nombre);
+  });
+});
+
+describe("seguirTrasFallo", () => {
+  it("lets Omitir continue and lets Ir a mi panel continue only on NO_IMPLEMENTADO", () => {
+    const noImplementado = { data: { codigo: "NO_IMPLEMENTADO", mensaje: "La actualización del perfil todavía no está disponible." } };
+    const otro = { data: { codigo: "DATOS_INVALIDOS", mensaje: "Revisa el nombre." } };
+
+    expect(seguirTrasFallo(false, otro)).toBe(true);
+    expect(seguirTrasFallo(true, noImplementado)).toBe(true);
+    expect(seguirTrasFallo(true, otro)).toBe(false);
+    expect(seguirTrasFallo(true, new Error("red"))).toBe(false);
   });
 });
 
