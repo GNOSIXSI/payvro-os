@@ -3,6 +3,7 @@
 import { useMutation } from "convex/react";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import { ConfiguraConvex } from "@/components/configura-convex";
 import { MensajeOperacion } from "@/components/mensaje-operacion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,15 +40,16 @@ export default function NuevoCobroPage() {
     }
     setPendiente(true);
     try {
-      if (!HAY_CONVEX) {
-        throw new Error("La creación de cobros todavía no está disponible.");
-      }
       const creado = await crear({ claveIdempotencia: clave, concepto: recortado, montoCentavos });
       router.push(`/panel/cobros/${publicIdCreado(creado)}`);
     } catch (fallo) {
       setError(mensajeDeError(fallo));
       setPendiente(false);
     }
+  }
+
+  if (!HAY_CONVEX) {
+    return <ConfiguraConvex />;
   }
 
   return (

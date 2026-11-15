@@ -23,10 +23,10 @@ test("/panel shows the three tiles and a row per fixture state", async ({ page }
   await expect(tabla.getByText("Esperando pago", { exact: true })).toBeVisible();
   await expect(tabla.getByText("Pago verificado", { exact: true })).toBeVisible();
   await expect(tabla.getByText("Liberado", { exact: true })).toBeVisible();
-  await expect(tabla.getByText("Borrador", { exact: true })).toBeVisible();
-  await expect(tabla.getByText("Expirado", { exact: true })).toBeVisible();
-  await expect(tabla.getByText("Cancelado", { exact: true })).toBeVisible();
   await expect(tabla.getByText("En revisión", { exact: true })).toBeVisible();
+  await expect(tabla.getByText("Borrador", { exact: true })).toHaveCount(0);
+  await expect(tabla.getByText("Expirado", { exact: true })).toHaveCount(0);
+  await expect(tabla.getByText("Cancelado", { exact: true })).toHaveCount(0);
 });
 
 test("/pagar fixture shows the business, the amount and waiting copy", async ({ page }) => {
@@ -64,6 +64,28 @@ test("keyboard can open nuevo cobro and copy a payer link", async ({ page, conte
   await expect(page.getByRole("button", { name: "Copiado" })).toBeVisible();
 });
 
+test("panel and alta call the Convex stubs", async ({ page }) => {
+  const enviados: string[] = [];
+  const recibidos: string[] = [];
+  page.on("websocket", (socket) => {
+    socket.on("framesent", (frame) => enviados.push(textoDeFrame(frame.payload)));
+    socket.on("framereceived", (frame) => recibidos.push(textoDeFrame(frame.payload)));
+  });
+
+  await page.goto("/panel");
+  await expect(page.getByText("Cobrado hoy")).toBeVisible();
+  await expect.poll(() => enviados.join("\n")).toContain("cobros:listar");
+  await expect.poll(() => enviados.join("\n")).toContain("cobros:resumenDelDia");
+
+  await page.goto("/panel/nuevo");
+  await page.getByLabel("Concepto").fill("Pedido de prueba");
+  await page.getByLabel("Monto").fill("0.01");
+  await page.getByRole("button", { name: "Crear cobro" }).click();
+  await expect(page.getByText("La creación de cobros todavía no está disponible.")).toBeVisible();
+  await expect.poll(() => enviados.join("\n")).toContain("cobros:crear");
+  await expect.poll(() => recibidos.join("\n")).toContain("NO_IMPLEMENTADO");
+});
+
 test("screens do not scroll horizontally at 375 and 1280", async ({ page }) => {
   const carpeta = path.join(process.cwd(), ".review", "os04-capturas");
   fs.mkdirSync(carpeta, { recursive: true });
@@ -72,6 +94,7 @@ test("screens do not scroll horizontally at 375 and 1280", async ({ page }) => {
     await page.setViewportSize({ width: ancho, height: 900 });
     for (const ruta of RUTAS) {
       await page.goto(ruta);
+      await expect(page.getByRole("heading").first()).toBeVisible();
       await expect.poll(() => anchoDeScroll(page)).toBeLessThanOrEqual(ancho + 1);
       const nombre = `${ruta.replaceAll("/", "_").replace(/^_/, "") || "raiz"}-${ancho}.png`;
       await page.screenshot({
@@ -81,6 +104,10 @@ test("screens do not scroll horizontally at 375 and 1280", async ({ page }) => {
     }
   }
 });
+
+function textoDeFrame(payload: string | Buffer): string {
+  return typeof payload === "string" ? payload : payload.toString("utf8");
+}
 
 async function anchoDeScroll(page: Page): Promise<number> {
   return page.evaluate(() => document.documentElement.scrollWidth);

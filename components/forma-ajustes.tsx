@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/convex/_generated/api";
-import { HAY_CONVEX } from "@/lib/hay-convex";
 import { mensajeDeError } from "@/lib/mensaje-error";
 import {
   COLORES_MARCA,
@@ -169,9 +168,6 @@ async function guardarPerfil(args: {
   }
   args.setPendiente(true);
   try {
-    if (!HAY_CONVEX) {
-      throw new Error("La actualización del perfil todavía no está disponible.");
-    }
     await args.actualizar({ nombre: recortado, giro: args.giro, colorMarca: args.color });
   } catch (fallo) {
     args.setError(mensajeDeError(fallo));
