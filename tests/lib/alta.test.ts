@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decidirAlta, interpretarAlta, PERFIL_OMITIDO, seguirTrasFallo } from "../../components/alta-local";
+import { decidirAlta, interpretarAlta, PERFIL_OMITIDO, debeSalirDeBienvenida, seguirTrasFallo } from "../../components/alta-local";
 
 const DEMO = "Dulces Ana — Ejemplo";
 const GUARDADO = {
@@ -105,6 +105,15 @@ describe("decidirAlta", () => {
     expect(PERFIL_OMITIDO.nombre.length).toBeLessThanOrEqual(40);
     expect(decision.mostrarAsistente).toBe(false);
     expect(decision.nombre).toBe(PERFIL_OMITIDO.nombre);
+  });
+});
+
+describe("debeSalirDeBienvenida", () => {
+  it("stays on bienvenida while Convex has not answered and leaves once a named profile arrives", () => {
+    expect(debeSalirDeBienvenida({ lista: true, esperandoPerfil: true, mostrarAsistente: false })).toBe(false);
+    expect(debeSalirDeBienvenida({ lista: false, esperandoPerfil: false, mostrarAsistente: false })).toBe(false);
+    expect(debeSalirDeBienvenida({ lista: true, esperandoPerfil: false, mostrarAsistente: true })).toBe(false);
+    expect(debeSalirDeBienvenida({ lista: true, esperandoPerfil: false, mostrarAsistente: false })).toBe(true);
   });
 });
 
