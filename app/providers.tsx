@@ -18,7 +18,9 @@ export function Providers({ children }: Readonly<{ children: ReactNode }>) {
     );
   }
 
-  return <ConvexProvider client={convex}>{children}</ConvexProvider>;
+  return (
+    <ConvexProvider client={convex}>{children}</ConvexProvider>
+  );
 }
 
 function ConvexWithClerk({ children }: Readonly<{ children: ReactNode }>) {

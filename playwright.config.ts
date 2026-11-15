@@ -14,13 +14,15 @@ export default defineConfig({
     ...devices["Desktop Chrome"],
   },
   webServer: {
-    command: "npm run start -- --hostname 127.0.0.1",
+    command: "bash e2e/servidor.sh",
     url: `http://127.0.0.1:${PORT}`,
     reuseExistingServer: false,
-    timeout: 120_000,
+    timeout: 180_000,
+    // SIGKILL skips the shell trap that puts .env.local and .convex back.
+    gracefulShutdown: { signal: "SIGTERM", timeout: 5_000 },
     env: {
       PORT,
-      NEXT_PUBLIC_CONVEX_URL: "",
+      CONVEX_AGENT_MODE: "anonymous",
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "",
     },
   },

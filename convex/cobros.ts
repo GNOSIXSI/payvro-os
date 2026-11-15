@@ -1,213 +1,125 @@
-// STUB WP-OS-01 — replaced by WP-OS-02
 import { paginationOptsValidator, paginationResultValidator } from "convex/server";
-import { ConvexError, v } from "convex/values";
-import {
-  COBROS_FIXTURE,
-  QR_STRING_FIXTURE,
-  RESUMEN_FIXTURE,
-} from "./_stub/fixtures";
+import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { peyConfiguracionDisponible, resolverNegocio, resolverNegocioEscritura } from "./puertos";
+import { cancelarCobro, crearCobro, reintentarCobro } from "./motor/cobros";
 
-const estadoCobroValidator = v.union(
-  v.literal("borrador"),
-  v.literal("esperando_pago"),
-  v.literal("pagado_verificado"),
-  v.literal("liberado"),
-  v.literal("expirado"),
-  v.literal("cancelado"),
-  v.literal("en_revision"),
+const estadoCobro = v.union(
+  v.literal("borrador"), v.literal("esperando_pago"), v.literal("pagado_verificado"), v.literal("liberado"),
+  v.literal("expirado"), v.literal("cancelado"), v.literal("en_revision"),
 );
-
-const estadoIntentoValidator = v.union(
-  v.literal("reservado"),
-  v.literal("creado"),
-  v.literal("pagado"),
-  v.literal("incierto"),
-  v.literal("fallido"),
-  v.literal("descartado"),
+const estadoIntento = v.union(
+  v.literal("reservado"), v.literal("creado"), v.literal("pagado"), v.literal("incierto"),
+  v.literal("fallido"), v.literal("descartado"),
 );
-
-const cobroListaValidator = v.object({
-  publicId: v.string(),
-  folio: v.number(),
-  concepto: v.string(),
-  montoCentavos: v.number(),
-  estado: estadoCobroValidator,
-  alerta: v.optional(v.literal("pago_duplicado")),
-  creadoEn: v.number(),
+const resultadoPago = v.union(
+  v.literal("coincide"), v.literal("monto_distinto"), v.literal("destino_distinto"),
+  v.literal("metodo_no_permitido"), v.literal("con_propina"), v.literal("duplicado"),
+  v.literal("pago_tardio"), v.literal("parcial"),
+);
+const cobroLista = v.object({
+  publicId: v.string(), folio: v.number(), concepto: v.string(), montoCentavos: v.number(), estado: estadoCobro,
+  alerta: v.optional(v.literal("pago_duplicado")), creadoEn: v.number(),
 });
-
-const resultadoPagoValidator = v.union(
-  v.literal("coincide"),
-  v.literal("monto_distinto"),
-  v.literal("destino_distinto"),
-  v.literal("metodo_no_permitido"),
-  v.literal("con_propina"),
-  v.literal("duplicado"),
-  v.literal("pago_tardio"),
-  v.literal("parcial"),
-);
-
-const cobroDetalleValidator = v.object({
-  publicId: v.string(),
-  folio: v.number(),
-  concepto: v.string(),
-  montoCentavos: v.number(),
-  estado: estadoCobroValidator,
-  alerta: v.optional(v.literal("pago_duplicado")),
-  creadoEn: v.number(),
-  expiraEn: v.number(),
-  intentoActivo: v.union(
-    v.null(),
-    v.object({
-      publicId: v.string(),
-      tipo: v.union(v.literal("link"), v.literal("qr")),
-      estado: estadoIntentoValidator,
-      montoCentavos: v.number(),
-      qrString: v.optional(v.string()),
-      urlPago: v.optional(v.string()),
-    }),
-  ),
-  pago: v.union(
-    v.null(),
-    v.object({
-      publicId: v.string(),
-      resultado: resultadoPagoValidator,
-      metodo: v.union(v.literal("CODI"), v.literal("CARD")),
-      baseCentavos: v.number(),
-      totalCentavos: v.number(),
-      pagadoEn: v.number(),
-    }),
-  ),
+const detalleCobro = v.object({
+  publicId: v.string(), folio: v.number(), concepto: v.string(), montoCentavos: v.number(), estado: estadoCobro,
+  alerta: v.optional(v.literal("pago_duplicado")), creadoEn: v.number(), expiraEn: v.number(),
+  intentoActivo: v.union(v.null(), v.object({
+    publicId: v.string(), tipo: v.union(v.literal("link"), v.literal("qr")), estado: estadoIntento,
+    montoCentavos: v.number(), qrString: v.optional(v.string()), urlPago: v.optional(v.string()),
+  })),
+  pago: v.union(v.null(), v.object({
+    publicId: v.string(), resultado: resultadoPago, metodo: v.union(v.literal("CODI"), v.literal("CARD")),
+    baseCentavos: v.number(), totalCentavos: v.number(), pagadoEn: v.number(),
+  })),
 });
 
 export const crear = mutation({
   args: {
-    claveIdempotencia: v.string(),
-    concepto: v.string(),
-    montoCentavos: v.number(),
+    claveIdempotencia: v.string(), concepto: v.string(), montoCentavos: v.number(),
     tipo: v.optional(v.union(v.literal("link"), v.literal("qr"))),
   },
-  returns: v.object({
-    publicId: v.string(),
-    folio: v.number(),
-    estado: estadoCobroValidator,
-  }),
-  handler: async () => {
-    throw new ConvexError({
-      codigo: "NO_IMPLEMENTADO",
-      mensaje: "La creación de cobros todavía no está disponible.",
-    });
+  returns: v.object({ publicId: v.string(), folio: v.number(), estado: estadoCobro }),
+  handler: async (ctx, args) => {
+    const resolucion = await resolverNegocioEscritura(ctx);
+    const peyConfigPresente = resolucion.modo === "live" ? peyConfiguracionDisponible() : true;
+    return await crearCobro(ctx, args, resolucion.negocioId, resolucion.modo, resolucion.actor, peyConfigPresente);
   },
 });
 
 export const listar = query({
-  args: {
-    estado: v.optional(estadoCobroValidator),
-    paginationOpts: paginationOptsValidator,
-  },
-  returns: paginationResultValidator(cobroListaValidator),
-  handler: async (_ctx, args) => {
-    const registros = [];
-
-    for (const cobro of COBROS_FIXTURE) {
-      if (args.estado && cobro.estado !== args.estado) {
-        continue;
-      }
-      registros.push(cobro);
-    }
-
-    const cursor = args.paginationOpts.cursor;
-    const parsedOffset = cursor === null ? 0 : Number(cursor);
-    const offset = Number.isSafeInteger(parsedOffset) && parsedOffset >= 0 ? parsedOffset : 0;
-    const limit = Math.max(1, args.paginationOpts.numItems);
-    const page = registros.slice(offset, offset + limit);
-    const nextOffset = offset + page.length;
-
-    return {
-      page,
-      isDone: nextOffset >= registros.length,
-      continueCursor: String(nextOffset),
-      splitCursor: null,
-      pageStatus: null,
-    };
+  args: { estado: v.optional(estadoCobro), paginationOpts: paginationOptsValidator },
+  returns: paginationResultValidator(cobroLista),
+  handler: async (ctx, args) => {
+    const { negocioId } = await resolverNegocio(ctx);
+    const consulta = args.estado
+      ? ctx.db.query("cobros").withIndex("by_negocio_estado", (q) => q.eq("negocioId", negocioId).eq("estado", args.estado!)).order("desc")
+      : ctx.db.query("cobros").withIndex("by_negocio", (q) => q.eq("negocioId", negocioId)).order("desc");
+    const pagina = await consulta.paginate(args.paginationOpts);
+    return { ...pagina, page: pagina.page.map((cobro) => ({
+      publicId: cobro.publicId, folio: cobro.folio, concepto: cobro.concepto, montoCentavos: cobro.montoCentavos,
+      estado: cobro.estado, ...(cobro.alerta ? { alerta: cobro.alerta } : {}), creadoEn: cobro.creadoEn,
+    })) };
   },
 });
 
 export const obtener = query({
   args: { publicId: v.string() },
-  returns: v.union(v.null(), cobroDetalleValidator),
-  handler: async (_ctx, args) => {
-    const cobro = COBROS_FIXTURE.find((registro) => registro.publicId === args.publicId);
-    if (!cobro) {
-      return null;
-    }
-
-    const intentoActivo = {
-      publicId: `int_${String(cobro.folio).padStart(26, "0")}`,
-      tipo: "qr" as const,
-      estado: cobro.estado === "esperando_pago" ? ("creado" as const) : ("pagado" as const),
-      montoCentavos: cobro.montoCentavos,
-      qrString: QR_STRING_FIXTURE,
-    };
-    const pago =
-      cobro.estado === "pagado_verificado" || cobro.estado === "liberado" || cobro.estado === "en_revision"
-        ? {
-            publicId: `pag_${String(cobro.folio).padStart(26, "0")}`,
-            resultado: cobro.estado === "en_revision" ? ("duplicado" as const) : ("coincide" as const),
-            metodo: "CODI" as const,
-            baseCentavos: cobro.montoCentavos,
-            totalCentavos: cobro.montoCentavos,
-            pagadoEn: cobro.creadoEn,
-          }
-        : null;
-
+  returns: v.union(v.null(), detalleCobro),
+  handler: async (ctx, args) => {
+    const { negocioId, modo } = await resolverNegocio(ctx);
+    const cobro = await ctx.db.query("cobros").withIndex("by_publicId", (q) => q.eq("publicId", args.publicId)).unique();
+    if (!cobro || cobro.negocioId !== negocioId || cobro.modo !== modo) return null;
+    const intento = cobro.intentoActivoId ? await ctx.db.get(cobro.intentoActivoId) : null;
+    const intentoValido = intento && intento.negocioId === negocioId && intento.cobroId === cobro._id && intento.modo === modo ? intento : null;
+    const pagos = await ctx.db.query("pagos").withIndex("by_cobro", (q) => q.eq("cobroId", cobro._id)).order("desc").first();
     return {
-      ...cobro,
-      expiraEn: cobro.creadoEn + 24 * 60 * 60 * 1000,
-      intentoActivo,
-      pago,
+      publicId: cobro.publicId, folio: cobro.folio, concepto: cobro.concepto, montoCentavos: cobro.montoCentavos,
+      estado: cobro.estado, ...(cobro.alerta ? { alerta: cobro.alerta } : {}), creadoEn: cobro.creadoEn, expiraEn: cobro.expiraEn,
+      intentoActivo: intentoValido ? {
+        publicId: intentoValido.publicId, tipo: intentoValido.tipo, estado: intentoValido.estado, montoCentavos: intentoValido.montoCentavos,
+        ...(intentoValido.qrString ? { qrString: intentoValido.qrString } : {}), ...(intentoValido.urlPago ? { urlPago: intentoValido.urlPago } : {}),
+      } : null,
+      pago: pagos ? {
+        publicId: pagos.publicId, resultado: pagos.resultado, metodo: pagos.metodo,
+        baseCentavos: pagos.baseCentavos, totalCentavos: pagos.totalCentavos, pagadoEn: pagos.pagadoEn,
+      } : null,
     };
   },
 });
 
 export const resumenDelDia = query({
   args: {},
-  returns: v.object({
-    verificadoHoyCentavos: v.number(),
-    porLiberar: v.number(),
-    enRevision: v.number(),
-  }),
-  handler: async () => RESUMEN_FIXTURE,
+  returns: v.object({ verificadoHoyCentavos: v.number(), porLiberar: v.number(), enRevision: v.number() }),
+  handler: async (ctx) => {
+    const { negocioId } = await resolverNegocio(ctx);
+    const negocio = await ctx.db.get(negocioId);
+    const ahora = new Date();
+    const inicio = Date.UTC(ahora.getUTCFullYear(), ahora.getUTCMonth(), ahora.getUTCDate());
+    if (!negocio) return { verificadoHoyCentavos: 0, porLiberar: 0, enRevision: 0 };
+    return {
+      verificadoHoyCentavos: negocio.verificadoHoyDia === inicio ? negocio.verificadoHoyCentavos ?? 0 : 0,
+      porLiberar: 0,
+      enRevision: negocio.enRevisionCount ?? 0,
+    };
+  },
 });
 
 export const cancelar = mutation({
-  args: {
-    publicId: v.string(),
-    claveIdempotencia: v.string(),
-  },
-  returns: v.object({ estado: estadoCobroValidator }),
-  handler: async () => {
-    throw new ConvexError({
-      codigo: "NO_IMPLEMENTADO",
-      mensaje: "La cancelación de cobros todavía no está disponible.",
-    });
+  args: { publicId: v.string(), claveIdempotencia: v.string() },
+  returns: v.object({ estado: estadoCobro }),
+  handler: async (ctx, args) => {
+    const resolucion = await resolverNegocioEscritura(ctx);
+    return await cancelarCobro(ctx, resolucion.negocioId, resolucion.modo, resolucion.actor, args.publicId, args.claveIdempotencia);
   },
 });
 
 export const reintentar = mutation({
-  args: {
-    publicId: v.string(),
-    claveIdempotencia: v.string(),
-  },
-  returns: v.object({
-    publicId: v.string(),
-    estado: estadoIntentoValidator,
-  }),
-  handler: async () => {
-    throw new ConvexError({
-      codigo: "NO_IMPLEMENTADO",
-      mensaje: "El reintento de cobros todavía no está disponible.",
-    });
+  args: { publicId: v.string(), claveIdempotencia: v.string() },
+  returns: v.object({ publicId: v.string(), estado: estadoIntento }),
+  handler: async (ctx, args) => {
+    const resolucion = await resolverNegocioEscritura(ctx);
+    const peyConfigPresente = resolucion.modo === "live" ? peyConfiguracionDisponible() : true;
+    return await reintentarCobro(ctx, resolucion.negocioId, resolucion.modo, resolucion.actor, args.publicId, args.claveIdempotencia, peyConfigPresente);
   },
 });

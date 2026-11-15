@@ -1,0 +1,25 @@
+{
+  "id": "01XXXXXXXXXXXXXXXXXXXXXXXX",
+  "status": "PAID",
+  "amount": 1.01,
+  "amountBreakdown": { "base": 1, "tip": 0.01 },
+  "currency": "MXN",
+  "paymentMethod": "CODI",
+  "payableType": "API_CODI_QR",
+  "payableId": "AB12CD34EF",
+  "applicationFee": 999,
+  "dateCreated": 1704067200,
+  "datePaid": 1704067260,
+  "metadata": {
+    "clabe": "000000000000000000",
+    "bankCode": "40012",
+    "accountType": "40",
+    "trackingKey": "TRACKING-EXAMPLE",
+    "externalMetadata": {
+      "payvro_cobro": "cob_example",
+      "payvro_intento": "int_example",
+      "payvro_modo": "live",
+      "customerEmail": "discarded"
+    }
+  }
+}
