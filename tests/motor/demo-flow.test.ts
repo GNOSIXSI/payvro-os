@@ -69,12 +69,18 @@ describe("persisted DEMO engine at the Convex caller boundary", () => {
     const despues = await t.query(api.cobros.obtener, { publicId: cobro.publicId });
     const estado = await leerEstado(t);
     const bitacora = estado.bitacora.sort((a, b) => a.seq - b.seq);
+    const vistaBitacora = await t.query(api.panel.bitacora, {
+      cobroPublicId: cobro.publicId,
+      paginationOpts: { numItems: 50, cursor: null },
+    });
     expect(despues).toMatchObject({ estado: "liberado", pago: { resultado: "coincide" } });
     expect(estado.pagos).toHaveLength(1);
     expect(bitacora.map((entrada) => entrada.tipo)).toEqual([
       "cobro.creado", "intento.reservado", "pey.llamada", "intento.creado", "pago.verificado", "cobro.liberado",
     ]);
     expect(bitacora.map((entrada) => entrada.seq)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(vistaBitacora.page.map((entrada) => entrada.tipo)).toEqual(bitacora.map((entrada) => entrada.tipo));
+    expect(vistaBitacora.page.map((entrada) => entrada.seq)).toEqual([1, 2, 3, 4, 5, 6]);
     expect(outbound).not.toHaveBeenCalled();
   });
 
