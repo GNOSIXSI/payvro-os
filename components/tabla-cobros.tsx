@@ -19,6 +19,8 @@ export type CobroLista = {
   estado: EstadoCobro;
   alerta?: "pago_duplicado";
   creadoEn: number;
+  verificadoEn?: number;
+  liberadoEn?: number;
 };
 
 export function TablaCobros({ cobros }: { cobros: readonly CobroLista[] }) {
