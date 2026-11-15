@@ -60,7 +60,7 @@ function CuerpoEstado({
 export function PagarAusente() {
   return (
     <main className="mx-auto flex min-h-screen max-w-lg flex-col items-center justify-center gap-4 px-6 text-center">
-      <p className="text-lg text-ink">Este cobro no existe o ya no está disponible.</p>
+      <h1 className="text-lg text-ink">Este cobro no existe o ya no está disponible.</h1>
     </main>
   );
 }

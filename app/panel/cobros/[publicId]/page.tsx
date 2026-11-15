@@ -30,7 +30,7 @@ export default function CobroDetallePage() {
     return <p className="text-muted">Cargando cobro…</p>;
   }
   if (!cobro) {
-    return <p className="text-ink">Este cobro no existe o ya no está disponible.</p>;
+    return <h1 className="text-ink">Este cobro no existe o ya no está disponible.</h1>;
   }
   return <DetalleCobro cobro={cobro} bitacora={entradasDe(bitacoraRemota.page)} />;
 }
