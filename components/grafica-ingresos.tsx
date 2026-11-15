@@ -8,7 +8,15 @@ const Barras = dynamic(() => import("@/components/barras-ingresos").then((mod) =
   ssr: false,
 });
 
-export function GraficaIngresos({ serie }: { serie: readonly DiaSerie[] }) {
+export function GraficaIngresos({
+  serie,
+  prefijo,
+  aviso,
+}: {
+  serie: readonly DiaSerie[];
+  prefijo: string;
+  aviso: string | null;
+}) {
   const total = serie.reduce((suma, dia) => suma + dia.centavos, 0);
   return (
     <section aria-label="Ingresos de los últimos 7 días" className="flex min-w-0 flex-col gap-4">
@@ -18,15 +26,28 @@ export function GraficaIngresos({ serie }: { serie: readonly DiaSerie[] }) {
       ) : (
         <Barras serie={serie} />
       )}
-      <ResumenSerie serie={serie} total={total} />
+      <ResumenSerie serie={serie} total={total} prefijo={prefijo} aviso={aviso} />
     </section>
   );
 }
 
-function ResumenSerie({ serie, total }: { serie: readonly DiaSerie[]; total: number }) {
+function ResumenSerie({
+  serie,
+  total,
+  prefijo,
+  aviso,
+}: {
+  serie: readonly DiaSerie[];
+  total: number;
+  prefijo: string;
+  aviso: string | null;
+}) {
   return (
     <div className="flex min-w-0 flex-col gap-2">
-      <p className="text-sm text-ink">Total de la semana: {formatoMXN(total)}</p>
+      {aviso ? <p className="text-sm font-medium text-ink">{aviso}</p> : null}
+      <p className="text-sm text-ink">
+        {prefijo}: {formatoMXN(total)}
+      </p>
       <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
         {serie.map((dia) => (
           <li key={dia.clave} className="min-w-0 rounded-md border border-line bg-white px-2 py-2 text-sm text-ink">
