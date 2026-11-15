@@ -78,6 +78,82 @@ describe("LIVE QR verification and heartbeat at the Convex caller boundary", () 
     expect(result.cobro?.estado).not.toBe("liberado");
   });
 
+  it("defers a paid detail while the account list still shows that id as pending, then releases once", async () => {
+    const t = nuevoLiveHarness();
+    const negocioId = await insertarNegocioLive(t);
+    const { intentoId, cobroId, cobroPublicId } = await insertarIntentoLive(t, negocioId);
+    let listadoPagado = false;
+    fixtureFetch((url) => {
+      if (url.pathname === `/transaction/codi/qr/${QR_ID}`) {
+        return respuestaJson(200, { items: [{ id: TX_ID }], nextToken: null });
+      }
+      if (url.pathname === `/transaction/${TX_ID}`) return respuestaJson(200, transaccionWire(TX_ID));
+      if (url.pathname === `/transaction/bank-account/${BANK_ID}`) {
+        const fila = transaccionWire(TX_ID, listadoPagado ? {} : { status: "PENDING", datePaid: undefined });
+        return respuestaJson(200, { items: [fila], nextToken: null });
+      }
+      throw new Error("unexpected fake pey request");
+    });
+
+    await expect(t.action(internal.motor.verificar.verificarIntento, { intentoId, origen: "sondeo" }))
+      .resolves.toEqual({ ok: false, resultado: "diferida" });
+    const diferido = await t.run(async (ctx) => ({
+      cobro: await ctx.db.get(cobroId),
+      intento: await ctx.db.get(intentoId),
+      pagos: await ctx.db.query("pagos").collect(),
+    }));
+    expect(diferido.cobro?.estado).toBe("esperando_pago");
+    expect(diferido.pagos).toHaveLength(0);
+    expect(diferido.intento?.barridoActivo).toBe(true);
+    await expect(t.mutation(api.publico.vigilar, { publicId: cobroPublicId })).resolves.toEqual({ ok: true });
+    const sondeo = await t.run((ctx) => ctx.db.get(intentoId));
+    expect(sondeo?.sondeoActivo).toBe(true);
+
+    listadoPagado = true;
+    await expect(t.action(internal.motor.verificar.verificarIntento, { intentoId, origen: "sondeo" }))
+      .resolves.toEqual({ ok: true, resultado: "coincide" });
+    const liberado = await t.run(async (ctx) => ({
+      cobro: await ctx.db.get(cobroId),
+      pagos: await ctx.db.query("pagos").collect(),
+    }));
+    expect(liberado.cobro?.estado).toBe("liberado");
+    expect(liberado.pagos).toHaveLength(1);
+
+    await expect(t.action(internal.motor.verificar.verificarIntento, { intentoId, origen: "sondeo" }))
+      .resolves.toEqual({ ok: true, resultado: "repetido" });
+    const otraVez = await t.run(async (ctx) => ctx.db.query("pagos").collect());
+    expect(otraVez).toHaveLength(1);
+  });
+
+  it("defers when the account list drops its only row as an unrecognized payable", async () => {
+    const t = nuevoLiveHarness();
+    const negocioId = await insertarNegocioLive(t);
+    const { intentoId, cobroId } = await insertarIntentoLive(t, negocioId);
+    fixtureFetch((url) => {
+      if (url.pathname === `/transaction/codi/qr/${QR_ID}`) return respuestaJson(200, { items: [{ id: TX_ID }], nextToken: null });
+      if (url.pathname === `/transaction/${TX_ID}`) return respuestaJson(200, transaccionWire(TX_ID));
+      if (url.pathname === `/transaction/bank-account/${BANK_ID}`) {
+        return respuestaJson(200, {
+          items: [{ id: TX_ID, status: "PAID", payableType: "UNRECOGNIZED", payableId: TX_ID }],
+          nextToken: null,
+        });
+      }
+      throw new Error("unexpected fake pey request");
+    });
+
+    await expect(t.action(internal.motor.verificar.verificarIntento, { intentoId, origen: "sondeo" }))
+      .resolves.toEqual({ ok: false, resultado: "diferida" });
+    const result = await t.run(async (ctx) => ({
+      cobro: await ctx.db.get(cobroId),
+      intento: await ctx.db.get(intentoId),
+      pagos: await ctx.db.query("pagos").collect(),
+    }));
+    expect(result.cobro?.estado).toBe("esperando_pago");
+    expect(result.cobro?.motivoRevision).toBeUndefined();
+    expect(result.pagos).toHaveLength(0);
+    expect(result.intento?.barridoActivo).toBe(true);
+  });
+
   it("defers without releasing when the configured-account listing exceeds its page bound", async () => {
     const t = nuevoLiveHarness();
     const negocioId = await insertarNegocioLive(t);
