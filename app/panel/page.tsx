@@ -1,12 +1,11 @@
 "use client";
 
 import { useQuery } from "convex/react";
-import { TablaCobros } from "@/components/tabla-cobros";
+import { ConfiguraConvex } from "@/components/configura-convex";
+import { TablaCobros, type CobroLista } from "@/components/tabla-cobros";
 import { TarjetaResumen } from "@/components/tarjeta-resumen";
 import { Monto } from "@/components/monto";
 import { api } from "@/convex/_generated/api";
-import { COBROS_DEMO, RESUMEN_DEMO } from "@/lib/demo-fixtures";
-import type { CobroLista } from "@/lib/demo-fixtures";
 import { esEstadoCobro } from "@/lib/estados";
 import { HAY_CONVEX } from "@/lib/hay-convex";
 
@@ -17,25 +16,22 @@ export default function PanelPage() {
     HAY_CONVEX ? { paginationOpts: { numItems: 50, cursor: null } } : "skip",
   );
 
-  const resumen = HAY_CONVEX ? resumenRemoto : RESUMEN_DEMO;
-  const cobros = HAY_CONVEX ? cobrosDePagina(listaRemota?.page) : COBROS_DEMO;
-  const cargando = HAY_CONVEX && (resumen === undefined || listaRemota === undefined);
-
-  if (cargando) {
+  if (!HAY_CONVEX) {
+    return <ConfiguraConvex />;
+  }
+  if (resumenRemoto === undefined || listaRemota === undefined) {
     return <p className="text-muted">Cargando cobros…</p>;
   }
 
-  if (!resumen || !cobros) {
-    return <p className="text-muted">No se pudieron cargar los cobros.</p>;
-  }
+  const cobros = cobrosDePagina(listaRemota.page);
 
   return (
     <div className="flex flex-col gap-8">
       <h1 className="font-display text-3xl font-semibold text-ink">Cobros</h1>
       <section className="grid gap-3 sm:grid-cols-3">
-        <TarjetaResumen titulo="Cobrado hoy" valor={<Monto centavos={resumen.verificadoHoyCentavos} />} />
-        <TarjetaResumen titulo="Por liberar" valor={resumen.porLiberar} />
-        <TarjetaResumen titulo="En revisión" valor={resumen.enRevision} />
+        <TarjetaResumen titulo="Cobrado hoy" valor={<Monto centavos={resumenRemoto.verificadoHoyCentavos} />} />
+        <TarjetaResumen titulo="Por liberar" valor={resumenRemoto.porLiberar} />
+        <TarjetaResumen titulo="En revisión" valor={resumenRemoto.enRevision} />
       </section>
       <TablaCobros cobros={cobros} />
     </div>
@@ -50,10 +46,7 @@ function cobrosDePagina(page: Array<{
   estado: string;
   alerta?: "pago_duplicado";
   creadoEn: number;
-}> | undefined): CobroLista[] | undefined {
-  if (!page) {
-    return undefined;
-  }
+}>): CobroLista[] {
   const filas: CobroLista[] = [];
   for (const fila of page) {
     if (!esEstadoCobro(fila.estado)) {
