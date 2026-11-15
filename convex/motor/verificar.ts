@@ -131,14 +131,14 @@ export const aplicarEvidencia = internalMutation({
       }
       return { ok: true, resultado: "duplicado" };
     }
-    if (cobro.estado === "en_revision" && cobro.motivoRevision === "parcial" && veredicto.resultado === "revisar" && veredicto.motivo === "parcial") {
+    if (cobro.estado === "en_revision" && veredicto.resultado === "revisar") {
       for (const pagoId of pagosInsertados) {
         await registrar(ctx, {
           negocioId: negocio._id, modo: negocio.modo, tipo: "pago.no_coincide", cobroId: cobro._id,
-          intentoId: intento._id, pagoId, actor: { tipo: "pey" }, detalle: { motivo: "parcial" }, en: ahora,
+          intentoId: intento._id, pagoId, actor: { tipo: "pey" }, detalle: { motivo: veredicto.motivo }, en: ahora,
         });
       }
-      return { ok: true, resultado: "parcial" };
+      return { ok: true, resultado: veredicto.motivo };
     }
     if (tardio) {
       const nuevoEstado = transicionarCobro(cobro.estado, "pago_tardio");
