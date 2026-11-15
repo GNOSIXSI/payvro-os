@@ -2,10 +2,12 @@
 
 import { useQuery } from "convex/react";
 import { ConfiguraConvex } from "@/components/configura-convex";
+import { GraficaIngresos } from "@/components/grafica-ingresos";
 import { TablaCobros, type CobroLista } from "@/components/tabla-cobros";
 import { TarjetaResumen } from "@/components/tarjeta-resumen";
 import { Monto } from "@/components/monto";
 import { api } from "@/convex/_generated/api";
+import { serieIngresos } from "@/lib/serie";
 import { esEstadoCobro } from "@/lib/estados";
 import { HAY_CONVEX } from "@/lib/hay-convex";
 
@@ -26,14 +28,18 @@ export default function PanelPage() {
   const cobros = cobrosDePagina(listaRemota.page);
 
   return (
-    <div className="flex flex-col gap-8">
-      <h1 className="font-display text-3xl font-semibold text-ink">Cobros</h1>
+    <div className="flex min-w-0 flex-col gap-8">
+      <h1 className="font-display text-3xl font-semibold text-ink">Inicio</h1>
       <section className="grid gap-3 sm:grid-cols-3">
         <TarjetaResumen titulo="Cobrado hoy" valor={<Monto centavos={resumenRemoto.verificadoHoyCentavos} />} />
         <TarjetaResumen titulo="Por liberar" valor={resumenRemoto.porLiberar} />
         <TarjetaResumen titulo="En revisión" valor={resumenRemoto.enRevision} />
       </section>
-      <TablaCobros cobros={cobros} />
+      <GraficaIngresos serie={serieIngresos(cobros)} />
+      <section id="cobros" className="flex min-w-0 flex-col gap-4">
+        <h2 className="font-display text-xl font-semibold text-ink">Cobros recientes</h2>
+        <TablaCobros cobros={cobros} />
+      </section>
     </div>
   );
 }
