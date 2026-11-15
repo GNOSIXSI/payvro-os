@@ -86,25 +86,25 @@ Node 24 was on `PATH` for npm commands. Exit codes:
 | `npm run lint` | 0 | ESLint clean. |
 | `npm test` | 0 | 7 files, 53 tests passed. |
 | `npm run build` | 0 | Next production build and typecheck pass. |
-| `npm run gate` | 0 | Full script including e2e and secrets scan passed; rerun on final report commit before handoff. |
+| `npm run gate` | 0 | Full script including e2e and secrets scan passed on HEAD `16e481d`; rerun after this report-only refresh before handoff. |
 | `lint-canon.sh pvos-os02b` | 0 | `LINT_OK`, `avisos=0`, `legado=R1b:0`. |
 | `git diff --check` | 0 | Clean. |
 | `test ! -d convex/_stub` | 0 | Stub directory absent. |
 | `grep -rn 'NO_IMPLEMENTADO' convex packages | wc -l` | 1 hit | Sole hit is the LIVE seam in `convex/motor/peyPuerto.ts:180`. |
 
-Full gate tail (typecheck, lint, 53 tests, build, e2e, secrets):
+Full gate tail from the passing run on HEAD `16e481d` (typecheck, lint, 53 tests, build, e2e, secrets):
 
 ```text
  Test Files  7 passed (7)
       Tests  53 passed (53)
 ...
-  ✓  1 e2e/humo.spec.ts:3:1 › home presents PAYVRO and the DEMO mode (1.2s)
-  1 passed (3.5s)
+  ✓  1 e2e/humo.spec.ts:3:1 › home presents PAYVRO and the DEMO mode (376ms)
+  1 passed (2.1s)
 ...
-scanned ~974687 bytes (974.69 KB) in 336ms
+scanned ~988473 bytes (988.47 KB) in 155ms
 no leaks found
 82 commits scanned.
-scanned ~1537013 bytes (1.54 MB) in 728ms
+scanned ~1550799 bytes (1.55 MB) in 413ms
 no leaks found
 ```
 
