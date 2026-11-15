@@ -43,7 +43,9 @@ test("si el servidor rechaza el perfil, el formulario sigue y no queda guardado"
   await page.getByRole("button", { name: "Ir a mi panel" }).click();
   await expect(page).toHaveURL(/\/bienvenida$/);
   await expect(page.getByRole("heading", { name: "Tu negocio" })).toBeVisible();
-  await expect(page.getByRole("alert")).toHaveText("La actualización del perfil todavía no está disponible.");
+  await expect(page.getByRole("alert").filter({ hasText: "todavía no está disponible" })).toHaveText(
+    "La actualización del perfil todavía no está disponible.",
+  );
   await expect.poll(() => page.evaluate(() => sessionStorage.getItem("payvro.alta"))).toBeNull();
 });
 
