@@ -18,6 +18,8 @@ export default defineConfig({
     url: `http://127.0.0.1:${PORT}`,
     reuseExistingServer: false,
     timeout: 180_000,
+    // SIGKILL skips the shell trap that puts .env.local and .convex back.
+    gracefulShutdown: { signal: "SIGTERM", timeout: 5_000 },
     env: {
       PORT,
       CONVEX_AGENT_MODE: "anonymous",
