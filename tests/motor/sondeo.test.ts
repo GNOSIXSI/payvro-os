@@ -89,8 +89,7 @@ describe("LIVE QR verification and heartbeat at the Convex caller boundary", () 
       }
       if (url.pathname === `/transaction/${TX_ID}`) return respuestaJson(200, transaccionWire(TX_ID));
       if (url.pathname === `/transaction/bank-account/${BANK_ID}`) {
-        const fila = transaccionWire(TX_ID, listadoPagado ? {} : { status: "PENDING" });
-        if (!listadoPagado) delete fila.datePaid;
+        const fila = transaccionWire(TX_ID, listadoPagado ? {} : { status: "PENDING", datePaid: undefined });
         return respuestaJson(200, { items: [fila], nextToken: null });
       }
       throw new Error("unexpected fake pey request");
