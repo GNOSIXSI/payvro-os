@@ -68,7 +68,11 @@ export const tablasMotor = {
     peyTransactionId: v.string(), payableType: v.string(), payableId: v.string(),
     metodo: v.union(v.literal("CODI"), v.literal("CARD")), baseCentavos: v.number(), feeCentavos: v.number(),
     tipCentavos: v.number(), totalCentavos: v.number(), pagadoEn: v.number(), claveRastreo: v.optional(v.string()),
-    resultado: v.string(), verificadoEn: v.number(),
+    resultado: v.union(
+      v.literal("coincide"), v.literal("monto_distinto"), v.literal("destino_distinto"),
+      v.literal("metodo_no_permitido"), v.literal("con_propina"), v.literal("duplicado"),
+      v.literal("pago_tardio"), v.literal("parcial"),
+    ), verificadoEn: v.number(),
   })
     .index("by_peyTransactionId", ["peyTransactionId"])
     .index("by_cobro", ["cobroId"])
@@ -96,7 +100,7 @@ export const tablasMotor = {
     tipo: v.union(v.literal("link"), v.literal("qr")), url: v.string(), qrString: v.optional(v.string()),
     simulacionVariantes: v.optional(v.array(v.union(v.literal("exacto"), v.literal("monto_distinto"), v.literal("duplicado"), v.literal("tarjeta")))),
   })
-    .index("by_id", ["id"])
+    .index("por_idSim", ["id"])
     .index("by_intento", ["intentoPublicId"])
     .index("by_negocio", ["negocioId"])
     .index("by_negocio_mode", ["negocioId", "modo"]),

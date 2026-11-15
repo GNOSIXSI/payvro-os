@@ -24,7 +24,7 @@ export const leerPayable = internalQuery({
   args: { negocioId: v.id("negocios"), id: v.string() },
   returns: v.union(v.null(), payableValidator),
   handler: async (ctx, args) => {
-    const row = await ctx.db.query("simPayables").withIndex("by_id", (q) => q.eq("id", args.id)).unique();
+    const row = await ctx.db.query("simPayables").withIndex("por_idSim", (q) => q.eq("id", args.id)).unique();
     if (!row || row.negocioId !== args.negocioId || row.modo !== "demo") return null;
     return { id: row.id, montoCentavos: row.montoCentavos, intentoPublicId: row.intentoPublicId, tipo: row.tipo, url: row.url, ...(row.qrString ? { qrString: row.qrString } : {}) };
   },
@@ -87,7 +87,7 @@ export const guardarPayable = internalMutation({
     if (!negocio || negocio.modo !== "demo" || !Number.isSafeInteger(args.montoCentavos) || args.montoCentavos < 1) {
       throw new ConvexError({ codigo: "MODO_INVALIDO", mensaje: "El simulador solo funciona con montos positivos en DEMO." });
     }
-    const anterior = await ctx.db.query("simPayables").withIndex("by_id", (q) => q.eq("id", args.id)).unique();
+    const anterior = await ctx.db.query("simPayables").withIndex("por_idSim", (q) => q.eq("id", args.id)).unique();
     if (anterior) {
       if (anterior.negocioId !== negocio._id || anterior.intentoPublicId !== args.intentoPublicId) {
         throw new ConvexError({ codigo: "NO_AUTORIZADO", mensaje: "El payable simulado no pertenece a este negocio." });
@@ -109,7 +109,7 @@ export const guardarTransacciones = internalMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const negocio = await ctx.db.get(args.negocioId);
-    const payable = await ctx.db.query("simPayables").withIndex("by_id", (q) => q.eq("id", args.payableId)).unique();
+    const payable = await ctx.db.query("simPayables").withIndex("por_idSim", (q) => q.eq("id", args.payableId)).unique();
     if (!negocio || negocio.modo !== "demo" || !payable || payable.negocioId !== negocio._id || payable.modo !== "demo") {
       throw new ConvexError({ codigo: "SOLO_DEMO", mensaje: "La simulación solo está disponible en DEMO." });
     }
@@ -188,7 +188,7 @@ export const simularYVerificar = internalAction({
     variante: v.union(v.literal("exacto"), v.literal("monto_distinto"), v.literal("duplicado"), v.literal("tarjeta")),
   },
   returns: v.object({ ok: v.boolean(), resultado: v.string() }),
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{ ok: boolean; resultado: string }> => {
     const modoConfigurado = await ctx.runQuery(internal.puertos.modoDeployment, {});
     const datos = await ctx.runQuery(internal.motor.verificar.datosIntento, { intentoId: args.intentoId });
     if (modoConfigurado !== "demo" || !datos || datos.negocioId !== args.negocioId || datos.modo !== "demo" || datos.modoNegocio !== "demo" || !datos.peyPayableId) {
