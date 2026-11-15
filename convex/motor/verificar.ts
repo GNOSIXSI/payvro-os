@@ -26,6 +26,11 @@ const linkValidator = v.object({
   transactions: v.array(v.object({ transactionId: v.string() })),
 });
 const origenValidator = v.union(v.literal("simulador"), v.literal("sondeo"), v.literal("barrido"), v.literal("webhook"));
+type ResultadoPago = "coincide" | "monto_distinto" | "destino_distinto" | "metodo_no_permitido" | "con_propina" | "duplicado" | "pago_tardio" | "parcial";
+
+function centavosDeComponente(pesos: number): number {
+  return pesos === 0 ? 0 : aCentavos(pesos);
+}
 
 export const datosIntento = internalQuery({
   args: { intentoId: v.id("intentos") },
@@ -85,7 +90,7 @@ export const aplicarEvidencia = internalMutation({
     const ahora = Date.now();
     const tardio = cobro.estado === "expirado" || cobro.estado === "cancelado";
     const liberado = cobro.estado === "liberado" || cobro.liberadoEn !== undefined;
-    let resultadoPago = veredicto.resultado === "coincide" ? "coincide" : veredicto.motivo;
+    let resultadoPago: ResultadoPago = veredicto.resultado === "coincide" ? "coincide" : veredicto.motivo;
     if (tardio) resultadoPago = "pago_tardio";
     if (liberado) resultadoPago = "duplicado";
     const pagosInsertados: Id<"pagos">[] = [];
@@ -98,8 +103,8 @@ export const aplicarEvidencia = internalMutation({
       let pagadoEn: number;
       try {
         baseCentavos = aCentavos(transaccion.amountBreakdown.base);
-        feeCentavos = aCentavos(transaccion.amountBreakdown.fee);
-        tipCentavos = aCentavos(transaccion.amountBreakdown.tip);
+        feeCentavos = centavosDeComponente(transaccion.amountBreakdown.fee);
+        tipCentavos = centavosDeComponente(transaccion.amountBreakdown.tip);
         totalCentavos = aCentavos(transaccion.amount);
         pagadoEn = transaccion.datePaid ? Date.parse(transaccion.datePaid) : Number.NaN;
       } catch {
@@ -182,7 +187,7 @@ export const aplicarEvidencia = internalMutation({
 export const verificarIntento = internalAction({
   args: { intentoId: v.id("intentos"), origen: origenValidator },
   returns: v.object({ ok: v.boolean(), resultado: v.string() }),
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{ ok: boolean; resultado: string }> => {
     const modoConfigurado = await ctx.runQuery(internal.puertos.modoDeployment, {});
     const datos = await ctx.runQuery(internal.motor.verificar.datosIntento, { intentoId: args.intentoId });
     if (!datos || !datos.peyPayableId || datos.modo !== datos.modoNegocio) return { ok: false, resultado: "sin_pago" };

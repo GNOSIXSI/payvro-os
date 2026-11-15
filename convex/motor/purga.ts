@@ -1,6 +1,24 @@
 import { ConvexError, v } from "convex/values";
 import { internal } from "../_generated/api";
 import { internalMutation } from "../_generated/server";
+import type { MutationCtx } from "../_generated/server";
+import type { Id, TableNames } from "../_generated/dataModel";
+
+type FilaPurga = { _id: Id<TableNames>; _creationTime: number; modo?: string };
+
+async function eliminarPaginaDemo(ctx: MutationCtx, filas: FilaPurga[], cutoff: number): Promise<number> {
+  let eliminados = 0;
+  for (const fila of filas) {
+    if (fila.modo !== undefined && fila.modo !== "demo") {
+      throw new ConvexError({ codigo: "SOLO_DEMO", mensaje: "La purga solo elimina datos DEMO." });
+    }
+    if (fila._creationTime <= cutoff) {
+      await ctx.db.delete(fila._id);
+      eliminados += 1;
+    }
+  }
+  return eliminados;
+}
 
 const tablas = ["simTransacciones", "simPayables", "pagos", "intentos", "eventosPey", "cobros", "bitacora", "demoLimits"] as const;
 const tablaValidator = v.union(
@@ -26,42 +44,42 @@ export const purgarDemo = internalMutation({
     switch (args.tabla) {
       case "simTransacciones": {
         const page = await ctx.db.query("simTransacciones").withIndex("by_negocio_mode", (q) => q.eq("negocioId", negocio._id).eq("modo", "demo")).paginate({ numItems: 100, cursor: args.cursor ?? null });
-        for (const row of page.page) { if (row.modo !== "demo") throw new ConvexError({ codigo: "SOLO_DEMO", mensaje: "La purga solo elimina datos DEMO." }); if (row._creationTime <= cutoff) { await ctx.db.delete(row._id); eliminados += 1; } }
+        eliminados += await eliminarPaginaDemo(ctx, page.page, cutoff);
         isDone = page.isDone; continueCursor = page.continueCursor; break;
       }
       case "simPayables": {
         const page = await ctx.db.query("simPayables").withIndex("by_negocio", (q) => q.eq("negocioId", negocio._id)).paginate({ numItems: 100, cursor: args.cursor ?? null });
-        for (const row of page.page) { if (row.modo !== "demo") throw new ConvexError({ codigo: "SOLO_DEMO", mensaje: "La purga solo elimina datos DEMO." }); if (row._creationTime <= cutoff) { await ctx.db.delete(row._id); eliminados += 1; } }
+        eliminados += await eliminarPaginaDemo(ctx, page.page, cutoff);
         isDone = page.isDone; continueCursor = page.continueCursor; break;
       }
       case "pagos": {
         const page = await ctx.db.query("pagos").withIndex("by_negocio_verificadoEn", (q) => q.eq("negocioId", negocio._id).lte("verificadoEn", cutoff)).paginate({ numItems: 100, cursor: args.cursor ?? null });
-        for (const row of page.page) { if (row.modo !== "demo") throw new ConvexError({ codigo: "SOLO_DEMO", mensaje: "La purga solo elimina datos DEMO." }); await ctx.db.delete(row._id); eliminados += 1; }
+        eliminados += await eliminarPaginaDemo(ctx, page.page, cutoff);
         isDone = page.isDone; continueCursor = page.continueCursor; break;
       }
       case "intentos": {
         const page = await ctx.db.query("intentos").withIndex("by_negocio_creadoEn", (q) => q.eq("negocioId", negocio._id).lte("creadoEn", cutoff)).paginate({ numItems: 100, cursor: args.cursor ?? null });
-        for (const row of page.page) { if (row.modo !== "demo") throw new ConvexError({ codigo: "SOLO_DEMO", mensaje: "La purga solo elimina datos DEMO." }); await ctx.db.delete(row._id); eliminados += 1; }
+        eliminados += await eliminarPaginaDemo(ctx, page.page, cutoff);
         isDone = page.isDone; continueCursor = page.continueCursor; break;
       }
       case "eventosPey": {
         const page = await ctx.db.query("eventosPey").withIndex("by_negocio_recibidoEn", (q) => q.eq("negocioId", negocio._id).lte("recibidoEn", cutoff)).paginate({ numItems: 100, cursor: args.cursor ?? null });
-        for (const row of page.page) { if (row.modo !== "demo") throw new ConvexError({ codigo: "SOLO_DEMO", mensaje: "La purga solo elimina datos DEMO." }); await ctx.db.delete(row._id); eliminados += 1; }
+        eliminados += await eliminarPaginaDemo(ctx, page.page, cutoff);
         isDone = page.isDone; continueCursor = page.continueCursor; break;
       }
       case "cobros": {
         const page = await ctx.db.query("cobros").withIndex("by_negocio_creadoEn", (q) => q.eq("negocioId", negocio._id).lte("creadoEn", cutoff)).paginate({ numItems: 100, cursor: args.cursor ?? null });
-        for (const row of page.page) { if (row.modo !== "demo") throw new ConvexError({ codigo: "SOLO_DEMO", mensaje: "La purga solo elimina datos DEMO." }); await ctx.db.delete(row._id); eliminados += 1; }
+        eliminados += await eliminarPaginaDemo(ctx, page.page, cutoff);
         isDone = page.isDone; continueCursor = page.continueCursor; break;
       }
       case "bitacora": {
         const page = await ctx.db.query("bitacora").withIndex("by_negocio_en", (q) => q.eq("negocioId", negocio._id).lte("en", cutoff)).paginate({ numItems: 100, cursor: args.cursor ?? null });
-        for (const row of page.page) { if (row.modo !== "demo") throw new ConvexError({ codigo: "SOLO_DEMO", mensaje: "La purga solo elimina datos DEMO." }); await ctx.db.delete(row._id); eliminados += 1; }
+        eliminados += await eliminarPaginaDemo(ctx, page.page, cutoff);
         isDone = page.isDone; continueCursor = page.continueCursor; break;
       }
       case "demoLimits": {
         const page = await ctx.db.query("demoLimits").withIndex("by_inicio", (q) => q.lte("inicio", cutoff)).paginate({ numItems: 100, cursor: args.cursor ?? null });
-        for (const row of page.page) { await ctx.db.delete(row._id); eliminados += 1; }
+        eliminados += await eliminarPaginaDemo(ctx, page.page, cutoff);
         isDone = page.isDone; continueCursor = page.continueCursor; break;
       }
     }
