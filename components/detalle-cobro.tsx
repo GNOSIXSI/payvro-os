@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { BotonCopiar } from "@/components/boton-copiar";
 import { ChipEstado } from "@/components/chip-estado";
 import { LineaDeTiempo, type EntradaBitacora } from "@/components/linea-de-tiempo";
@@ -82,26 +82,38 @@ function MostrarQr({ valor }: { valor: string }) {
   );
 }
 
+const DESTINO_SERVIDOR: DestinoCopia = {
+  disponible: false,
+  aviso: "El link de pago aún no está disponible",
+};
+
 function CopiaPagina({ publicId, urlPago }: { publicId: string; urlPago?: string }) {
-  const [destino, setDestino] = useState<DestinoCopia | null>(null);
-
-  useEffect(() => {
-    setDestino(destinoDeCopia(publicId, urlPago));
-  }, [publicId, urlPago]);
-
-  if (!destino?.disponible) {
+  const destino = useDestino(publicId, urlPago);
+  if (!destino.disponible) {
     return (
       <div className="flex flex-col gap-2">
         <Button type="button" disabled className="min-h-11">
           Copiar link
         </Button>
-        <p className="text-sm text-muted">El link de pago aún no está disponible</p>
+        <p className="text-sm text-muted">{DESTINO_SERVIDOR.aviso}</p>
       </div>
     );
   }
 
   const texto = destino.texto;
   return <BotonCopiar etiqueta={destino.etiqueta} obtenerTexto={() => texto} />;
+}
+
+function useDestino(publicId: string, urlPago: string | undefined): DestinoCopia {
+  return useSyncExternalStore(
+    suscribirNada,
+    () => destinoDeCopia(publicId, urlPago),
+    () => DESTINO_SERVIDOR,
+  );
+}
+
+function suscribirNada(): () => void {
+  return () => {};
 }
 
 function WhatsAppDeshabilitado() {
