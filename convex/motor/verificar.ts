@@ -1,8 +1,10 @@
 import { ConvexError, v } from "convex/values";
+import type { RegisteredAction } from "convex/server";
 import { internal } from "../_generated/api";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
+import type { ActionCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
-import { aCentavos, evaluar, transicionarCobro, transicionarIntento } from "@payvro/engine";
+import { aCentavos, evaluar, PeyClientError, transicionarCobro, transicionarIntento } from "@payvro/engine";
 import type { Evidencia, EvidenciaLink, TransaccionPey } from "@payvro/engine";
 import { nuevoId } from "@payvro/engine/ids";
 import { registrar } from "./bitacora";
@@ -27,6 +29,32 @@ const linkValidator = v.object({
 });
 const origenValidator = v.union(v.literal("simulador"), v.literal("sondeo"), v.literal("barrido"), v.literal("webhook"));
 type ResultadoPago = "coincide" | "monto_distinto" | "destino_distinto" | "metodo_no_permitido" | "con_propina" | "duplicado" | "pago_tardio" | "parcial";
+const MAX_PAGINAS_QR = 10;
+const MAX_PAGINAS_CUENTA = 10;
+const SONDEO_INTERVALO_MS = 1_800;
+const SONDEO_MAX_MS = 30_000;
+const SONDEO_CADENA_MS = 15 * 60 * 1000;
+const SONDEO_LEASE_MS = 60_000;
+const BARRIDO_INTERVALO_MS = 45_000;
+const BARRIDO_DESCARTADO_MS = 60_000;
+
+function mismaTransaccion(a: TransaccionPey, b: TransaccionPey): boolean {
+  return a.transactionId === b.transactionId && a.status === "PAID" && b.status === "PAID" &&
+    a.payableType === b.payableType && a.payableId === b.payableId && a.currency === b.currency &&
+    a.paymentMethod === b.paymentMethod && a.amount === b.amount &&
+    a.amountBreakdown.base === b.amountBreakdown.base && a.amountBreakdown.tip === b.amountBreakdown.tip &&
+    a.amountBreakdown.fee === b.amountBreakdown.fee && a.datePaid === b.datePaid;
+}
+
+async function leaseSondeoDisponible(ctx: ActionCtx, intentoId: Id<"intentos">, leaseId?: string): Promise<boolean> {
+  if (!leaseId) return true;
+  return Boolean(await ctx.runMutation(internal.motor.verificar.prepararTickSondeo, { intentoId, leaseId }));
+}
+
+function codigoConvex(error: unknown): string | undefined {
+  if (!(error instanceof ConvexError) || typeof error.data !== "object" || error.data === null || !("codigo" in error.data)) return undefined;
+  return typeof error.data.codigo === "string" ? error.data.codigo : undefined;
+}
 
 function centavosDeComponente(pesos: number): number {
   return pesos === 0 ? 0 : aCentavos(pesos);
@@ -53,6 +81,31 @@ export const datosIntento = internalQuery({
       destino: intento.destino, cobroId: cobro._id, cobroPublicId: cobro.publicId,
       montoCentavos: cobro.montoCentavos, estadoCobro: cobro.estado, expiraEn: cobro.expiraEn, modoNegocio: negocio.modo,
     };
+  },
+});
+
+export const registrarLectura = internalMutation({
+  args: { intentoId: v.id("intentos"), exitosa: v.boolean() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const intento = await ctx.db.get(args.intentoId);
+    if (!intento) return null;
+    const cobro = await ctx.db.get(intento.cobroId);
+    const negocio = await ctx.db.get(intento.negocioId);
+    if (!cobro || !negocio || cobro.negocioId !== negocio._id || intento.negocioId !== negocio._id || intento.modo !== negocio.modo) return null;
+    const ahora = Date.now();
+    const recuperable = intento.tipo === "qr" && (
+      (intento.estado === "creado" && cobro.estado === "esperando_pago") ||
+      (intento.estado === "descartado" && intento.peyPayableId !== undefined && cobro.creadoEn >= ahora - 24 * 60 * 60 * 1000)
+    );
+    const espera = intento.estado === "descartado" ? BARRIDO_DESCARTADO_MS : BARRIDO_INTERVALO_MS;
+    await ctx.db.patch(intento._id, {
+      sondeos: intento.sondeos + 1,
+      ultimaVerificacionEn: ahora,
+      barridoActivo: recuperable,
+      siguienteBarridoEn: recuperable ? ahora + (args.exitosa ? espera : 60_000) : undefined,
+    });
+    return null;
   },
 });
 
@@ -185,7 +238,7 @@ export const aplicarEvidencia = internalMutation({
 });
 
 export const verificarIntento = internalAction({
-  args: { intentoId: v.id("intentos"), origen: origenValidator },
+  args: { intentoId: v.id("intentos"), origen: origenValidator, leaseId: v.optional(v.string()) },
   returns: v.object({ ok: v.boolean(), resultado: v.string() }),
   handler: async (ctx, args): Promise<{ ok: boolean; resultado: string }> => {
     const modoConfigurado = await ctx.runQuery(internal.puertos.modoDeployment, {});
@@ -193,27 +246,160 @@ export const verificarIntento = internalAction({
     if (!datos || !datos.peyPayableId || datos.modo !== datos.modoNegocio) return { ok: false, resultado: "sin_pago" };
     if (datos.modo !== modoConfigurado) throw new ConvexError({ codigo: "MODO_INVALIDO", mensaje: "El modo del intento no coincide con la instalación." });
     if (datos.estado !== "creado" && datos.estado !== "descartado" && datos.estado !== "pagado") return { ok: false, resultado: "sin_pago" };
-    const puerto = crearPeyPuerto(ctx, datos.negocioId, datos.modo);
-    let link: EvidenciaLink | undefined;
-    const transacciones: TransaccionPey[] = [];
-    if (datos.tipo === "link") {
-      link = await puerto.leerLink(datos.peyPayableId);
-      for (const transaccion of link.transactions) transacciones.push(await puerto.leerTransaccion(transaccion.transactionId));
-    } else {
-      let token: string | undefined;
-      do {
-        const pagina = await puerto.listarTransaccionesQr(datos.peyPayableId, token);
-        for (const transaccion of pagina.transactions) transacciones.push(await puerto.leerTransaccion(transaccion.transactionId));
-        token = pagina.nextToken;
-      } while (token && transacciones.length < 1000);
-      if (token) throw new ConvexError({ codigo: "TRANSICION_INVALIDA", mensaje: "La evidencia excede el límite de verificación." });
+    if (datos.modo === "live" && datos.tipo !== "qr") return { ok: false, resultado: "capacidad_no_disponible" };
+
+    try {
+      const puerto = crearPeyPuerto(ctx, datos.negocioId, datos.modo);
+      let link: EvidenciaLink | undefined;
+      const transacciones: TransaccionPey[] = [];
+      if (datos.tipo === "link") {
+        if (!(await leaseSondeoDisponible(ctx, args.intentoId, args.leaseId))) return { ok: false, resultado: "sondeo_deteniendo" };
+        link = await puerto.leerLink(datos.peyPayableId);
+        for (const referencia of link.transactions) {
+          if (!(await leaseSondeoDisponible(ctx, args.intentoId, args.leaseId))) return { ok: false, resultado: "sondeo_deteniendo" };
+          transacciones.push(await puerto.leerTransaccion(referencia.transactionId));
+        }
+      } else {
+        const referencias = new Set<string>();
+        let token: string | undefined;
+        let completa = false;
+        for (let paginaNumero = 0; paginaNumero < MAX_PAGINAS_QR; paginaNumero += 1) {
+          if (!(await leaseSondeoDisponible(ctx, args.intentoId, args.leaseId))) return { ok: false, resultado: "sondeo_deteniendo" };
+          const pagina = await puerto.listarTransaccionesQr(datos.peyPayableId, token);
+          for (const referencia of pagina.transactions) referencias.add(referencia.transactionId);
+          token = pagina.nextToken ?? undefined;
+          if (!token) {
+            completa = true;
+            break;
+          }
+        }
+        if (!completa) {
+          await ctx.runMutation(internal.motor.verificar.registrarLectura, { intentoId: args.intentoId, exitosa: false });
+          return { ok: false, resultado: "evidencia_incompleta" };
+        }
+        for (const transactionId of referencias) {
+          if (!(await leaseSondeoDisponible(ctx, args.intentoId, args.leaseId))) return { ok: false, resultado: "sondeo_deteniendo" };
+          transacciones.push(await puerto.leerTransaccion(transactionId));
+        }
+      }
+
+      let destinoConfirmado = false;
+      if (datos.tipo === "qr" && datos.destino === "bank_account_id") {
+        const relevantes = transacciones.filter((tx) => tx.status === "PAID" && tx.currency === "MXN" && tx.payableType === "API_CODI_QR" && tx.payableId === datos.peyPayableId);
+        if (relevantes.length > 0) {
+          const encontrados = new Set<string>();
+          let token: string | undefined;
+          let listaCompleta = false;
+          for (let paginaNumero = 0; paginaNumero < MAX_PAGINAS_CUENTA; paginaNumero += 1) {
+            if (!(await leaseSondeoDisponible(ctx, args.intentoId, args.leaseId))) return { ok: false, resultado: "sondeo_deteniendo" };
+            const pagina = await puerto.listarTransaccionesCuenta(token);
+            for (const row of pagina.transactions) {
+              const objetivo = relevantes.find((tx) => tx.transactionId === row.transactionId);
+              if (objetivo && mismaTransaccion(objetivo, row)) encontrados.add(row.transactionId);
+            }
+            if (relevantes.every((tx) => encontrados.has(tx.transactionId))) {
+              listaCompleta = true;
+              destinoConfirmado = true;
+              break;
+            }
+            token = pagina.nextToken ?? undefined;
+            if (!token) {
+              listaCompleta = true;
+              break;
+            }
+          }
+          if (!listaCompleta) {
+            await ctx.runMutation(internal.motor.verificar.registrarLectura, { intentoId: args.intentoId, exitosa: false });
+            return { ok: false, resultado: "evidencia_incompleta" };
+          }
+        }
+      }
+      const evidencia: Evidencia = {
+        transacciones,
+        ...(link ? { link } : {}),
+        ...(datos.tipo === "qr" ? { destinoConfirmado } : {}),
+      };
+      const resultado = await ctx.runMutation(internal.motor.verificar.aplicarEvidencia, { intentoId: args.intentoId, evidencia, origen: args.origen });
+      await ctx.runMutation(internal.motor.verificar.registrarLectura, { intentoId: args.intentoId, exitosa: true });
+      return resultado;
+    } catch (error) {
+      await ctx.runMutation(internal.motor.verificar.registrarLectura, { intentoId: args.intentoId, exitosa: false });
+      if (error instanceof PeyClientError || (error instanceof ConvexError && codigoConvex(error) === "CUENTA_NO_ACTIVA")) {
+        return { ok: false, resultado: "diferida" };
+      }
+      throw error;
     }
-    const destinoConfirmado = datos.tipo === "qr" && datos.destino === "bank_account_id";
-    const evidencia: Evidencia = {
-      transacciones,
-      ...(link ? { link } : {}),
-      ...(datos.tipo === "qr" ? { destinoConfirmado } : {}),
-    };
-    return await ctx.runMutation(internal.motor.verificar.aplicarEvidencia, { intentoId: args.intentoId, evidencia, origen: args.origen });
+  },
+});
+
+export const prepararTickSondeo = internalMutation({
+  args: { intentoId: v.id("intentos"), leaseId: v.string() },
+  returns: v.union(v.null(), v.object({ listo: v.boolean() })),
+  handler: async (ctx, args) => {
+    const intento = await ctx.db.get(args.intentoId);
+    const ahora = Date.now();
+    if (!intento || !intento.sondeoActivo || intento.sondeoLeaseId !== args.leaseId || (intento.sondeoLeaseHasta ?? 0) <= ahora) return null;
+    const cobro = await ctx.db.get(intento.cobroId);
+    const negocio = await ctx.db.get(intento.negocioId);
+    const inicio = intento.sondeoInicioEn;
+    const activo = cobro?.estado === "esperando_pago" && intento.estado === "creado" && negocio?.modo === "live" &&
+      intento.modo === "live" && cobro.negocioId === negocio._id && intento.negocioId === negocio._id &&
+      intento.vigiladoHasta !== undefined && intento.vigiladoHasta > ahora && inicio !== undefined && ahora - inicio < SONDEO_CADENA_MS;
+    if (!activo) {
+      await ctx.db.patch(intento._id, { sondeoActivo: false, sondeoLeaseHasta: undefined, sondeoLeaseId: undefined });
+      return null;
+    }
+    await ctx.db.patch(intento._id, { sondeoLeaseHasta: ahora + SONDEO_LEASE_MS });
+    return { listo: true };
+  },
+});
+
+export const terminarTickSondeo = internalMutation({
+  args: { intentoId: v.id("intentos"), leaseId: v.string(), exitoso: v.boolean() },
+  returns: v.object({ programado: v.boolean() }),
+  handler: async (ctx, args) => {
+    const intento = await ctx.db.get(args.intentoId);
+    const ahora = Date.now();
+    if (!intento || intento.sondeoLeaseId !== args.leaseId || !intento.sondeoActivo) return { programado: false };
+    const cobro = await ctx.db.get(intento.cobroId);
+    const negocio = await ctx.db.get(intento.negocioId);
+    const inicio = intento.sondeoInicioEn;
+    const debeSeguir = cobro?.estado === "esperando_pago" && intento.estado === "creado" && negocio?.modo === "live" &&
+      intento.modo === "live" && intento.vigiladoHasta !== undefined && intento.vigiladoHasta > ahora &&
+      inicio !== undefined && ahora - inicio < SONDEO_CADENA_MS;
+    if (!debeSeguir) {
+      await ctx.db.patch(intento._id, { sondeoActivo: false, sondeoLeaseHasta: undefined, sondeoLeaseId: undefined });
+      return { programado: false };
+    }
+    const previo = intento.sondeoBackoffMs ?? 2_000;
+    const intervalo = args.exitoso
+      ? SONDEO_INTERVALO_MS
+      : Math.min(SONDEO_MAX_MS, previo < 2_000 ? 2_000 : previo * 2);
+    const leaseId = nuevoId("evt_");
+    await ctx.db.patch(intento._id, {
+      sondeoLeaseId: leaseId,
+      sondeoLeaseHasta: ahora + SONDEO_LEASE_MS,
+      sondeoBackoffMs: intervalo,
+    });
+    await ctx.scheduler.runAfter(intervalo, internal.motor.verificar.tickSondeo, { intentoId: intento._id, leaseId });
+    return { programado: true };
+  },
+});
+
+export const tickSondeo: RegisteredAction<"internal", { intentoId: Id<"intentos">; leaseId: string }, { ok: boolean }> = internalAction({
+  args: { intentoId: v.id("intentos"), leaseId: v.string() },
+  returns: v.object({ ok: v.boolean() }),
+  handler: async (ctx, args) => {
+    const preparado = await ctx.runMutation(internal.motor.verificar.prepararTickSondeo, args);
+    if (!preparado) return { ok: false };
+    let exitoso = false;
+    try {
+      const resultado = await ctx.runAction(internal.motor.verificar.verificarIntento, { intentoId: args.intentoId, origen: "sondeo", leaseId: args.leaseId });
+      exitoso = resultado.ok;
+    } catch {
+      exitoso = false;
+    }
+    const finalizado = await ctx.runMutation(internal.motor.verificar.terminarTickSondeo, { ...args, exitoso });
+    return { ok: finalizado.programado };
   },
 });

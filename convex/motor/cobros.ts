@@ -18,6 +18,15 @@ export interface EntradaCrearCobro {
   tipo?: "qr" | "link";
 }
 
+const CUENTA_FRESCA_MS = 24 * 60 * 60 * 1000;
+
+function exigirCuentaLista(negocio: { estadoCuentaPey?: string; cuentaRevisadaEn?: number }, configPresente: boolean): void {
+  const revisada = negocio.cuentaRevisadaEn;
+  if (!configPresente || negocio.estadoCuentaPey !== "ACTIVE" || revisada === undefined || Date.now() - revisada > CUENTA_FRESCA_MS || revisada > Date.now()) {
+    throw new ConvexError({ codigo: "CUENTA_NO_ACTIVA", mensaje: "La cuenta pey no está activa o falta configuración. Verifica la cuenta antes de crear cobros." });
+  }
+}
+
 function validarClave(clave: string): void {
   if (clave.length < 16 || clave.length > 128 || !/^[A-Za-z0-9_-]+$/.test(clave)) {
     throw new ConvexError({ codigo: "CLAVE_REUTILIZADA", mensaje: "La clave de idempotencia no tiene un formato válido." });
@@ -41,6 +50,7 @@ export async function crearCobro(
   negocioId: Id<"negocios">,
   modo: Modo,
   actor: Actor,
+  peyConfigPresente: boolean,
 ): Promise<{ publicId: string; folio: number; estado: EstadoCobro }> {
   const tipo = validarEntrada(entrada);
   const negocio = await ctx.db.get(negocioId);
@@ -59,6 +69,10 @@ export async function crearCobro(
     }
     return { publicId: existente.publicId, folio: existente.folio, estado: existente.estado };
   }
+  if (modo === "live") {
+    if (tipo !== "qr") throw new ConvexError({ codigo: "TRANSICION_INVALIDA", mensaje: "En LIVE solo se admiten cobros CoDi QR." });
+    exigirCuentaLista(negocio, peyConfigPresente);
+  }
   if (negocio.cobrosPausados) {
     throw new ConvexError({ codigo: "COBROS_PAUSADOS", mensaje: "La creación de cobros está pausada." });
   }
@@ -75,7 +89,8 @@ export async function crearCobro(
   const intentoId = await ctx.db.insert("intentos", {
     negocioId, modo, publicId: nuevoIntentoId(), cobroId, tipo, estado: "reservado",
     montoCentavos: entrada.montoCentavos, destino: tipo === "qr" ? "bank_account_id" : "cuenta_de_la_llave",
-    sondeoActivo: false, sondeos: 0, claveIdempotencia: entrada.claveIdempotencia, creadoEn: ahora,
+    sondeoActivo: false, sondeos: 0, barridoActivo: true, siguienteBarridoEn: ahora + 45_000,
+    claveIdempotencia: entrada.claveIdempotencia, creadoEn: ahora,
   });
   await ctx.db.patch(cobroId, { intentoActivoId: intentoId });
   await registrar(ctx, {
@@ -142,6 +157,7 @@ export async function reintentarCobro(
   actor: Actor,
   publicId: string,
   claveIdempotencia: string,
+  peyConfigPresente: boolean,
 ): Promise<{ publicId: string; estado: "reservado" | "creado" | "pagado" | "incierto" | "fallido" | "descartado" }> {
   validarClave(claveIdempotencia);
   const porClave = await ctx.db.query("intentos").withIndex("by_negocio_clave", (q) => q.eq("negocioId", negocioId).eq("claveIdempotencia", claveIdempotencia)).unique();
@@ -162,6 +178,10 @@ export async function reintentarCobro(
   }
   const negocio = await ctx.db.get(negocioId);
   if (!negocio || negocio.modo !== modo) throw new ConvexError({ codigo: "MODO_INVALIDO", mensaje: "El modo del negocio no coincide con la instalación." });
+  if (modo === "live") {
+    if ((previo?.tipo ?? "qr") !== "qr") throw new ConvexError({ codigo: "TRANSICION_INVALIDA", mensaje: "En LIVE solo se admiten cobros CoDi QR." });
+    exigirCuentaLista(negocio, peyConfigPresente);
+  }
   if (negocio.cobrosPausados) throw new ConvexError({ codigo: "COBROS_PAUSADOS", mensaje: "La creación de cobros está pausada." });
   if (modo === "demo") await consumirLimite(ctx, `crear:${negocioId}`, 10);
   const ahora = Date.now();
@@ -169,7 +189,8 @@ export async function reintentarCobro(
     negocioId, modo, publicId: nuevoIntentoId(), cobroId: cobro._id,
     tipo: previo?.tipo ?? "qr", estado: "reservado", montoCentavos: cobro.montoCentavos,
     destino: (previo?.tipo ?? "qr") === "qr" ? "bank_account_id" : "cuenta_de_la_llave",
-    sondeoActivo: false, sondeos: 0, claveIdempotencia, creadoEn: ahora,
+    sondeoActivo: false, sondeos: 0, barridoActivo: true, siguienteBarridoEn: ahora + 45_000,
+    claveIdempotencia, creadoEn: ahora,
   });
   await ctx.db.patch(cobro._id, { intentoActivoId: intentoId });
   await registrar(ctx, {

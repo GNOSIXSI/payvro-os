@@ -1,7 +1,8 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { modo } from "./puertos";
-import { esId } from "@payvro/engine/ids";
+import { esId, nuevoId } from "@payvro/engine/ids";
 import { consumirLimite } from "./motor/limites";
 
 const estadoVisible = (estado: string): string => {
@@ -59,9 +60,34 @@ export const vigilar = mutation({
     if (cobro.estado !== "esperando_pago" || !cobro.intentoActivoId) return { ok: false };
     const negocio = await ctx.db.get(cobro.negocioId);
     const intento = await ctx.db.get(cobro.intentoActivoId);
-    if (!negocio || !intento || intento.negocioId !== negocio._id || negocio.modo !== cobro.modo) return { ok: false };
+    if (!negocio || !intento || intento.negocioId !== negocio._id || intento.cobroId !== cobro._id || negocio.modo !== cobro.modo) return { ok: false };
     await consumirLimite(ctx, `vigilar:${cobro.publicId}`, 60);
-    await ctx.db.patch(intento._id, { vigiladoHasta: Date.now() + 30_000 });
+    const ahora = Date.now();
+    const vigiladoHasta = ahora + 30_000;
+    if (negocio.modo !== "live" || intento.tipo !== "qr" || intento.estado !== "creado") {
+      await ctx.db.patch(intento._id, { vigiladoHasta });
+      return { ok: true };
+    }
+    const inicio = intento.sondeoInicioEn ?? ahora;
+    if (ahora - inicio >= 15 * 60 * 1000) {
+      await ctx.db.patch(intento._id, { vigiladoHasta, sondeoActivo: false, sondeoLeaseHasta: undefined, sondeoLeaseId: undefined, sondeoInicioEn: inicio });
+      return { ok: true };
+    }
+    const leaseVigente = intento.sondeoActivo && intento.sondeoLeaseId !== undefined && (intento.sondeoLeaseHasta ?? 0) > ahora;
+    if (leaseVigente) {
+      await ctx.db.patch(intento._id, { vigiladoHasta });
+      return { ok: true };
+    }
+    const leaseId = nuevoId("evt_");
+    await ctx.db.patch(intento._id, {
+      vigiladoHasta,
+      sondeoActivo: true,
+      sondeoInicioEn: inicio,
+      sondeoLeaseHasta: ahora + 60_000,
+      sondeoLeaseId: leaseId,
+      sondeoBackoffMs: intento.sondeoBackoffMs ?? 1_800,
+    });
+    await ctx.scheduler.runAfter(0, internal.motor.verificar.tickSondeo, { intentoId: intento._id, leaseId });
     return { ok: true };
   },
 });

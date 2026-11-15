@@ -90,9 +90,13 @@ export async function credencialPey(ctx: ActionCtx, negocioId: Id<"negocios">) {
   const apiKey = process.env.PEY_API_KEY;
   const bankAccountId = process.env.PEY_BANK_ACCOUNT_ID;
   if (!apiKey || !bankAccountId) {
-    throw new ConvexError({ codigo: "MODO_INVALIDO", mensaje: "Falta la configuración de pagos." });
+    throw new ConvexError({ codigo: "CUENTA_NO_ACTIVA", mensaje: "Falta la configuración de pagos. Verifica la cuenta antes de crear cobros." });
   }
   return { apiKey, bankAccountId, ...(process.env.PEY_WEBHOOK_SECRET ? { webhookSecret: process.env.PEY_WEBHOOK_SECRET } : {}) };
+}
+
+export function peyConfiguracionDisponible(): boolean {
+  return Boolean(process.env.PEY_API_KEY && process.env.PEY_BANK_ACCOUNT_ID);
 }
 
 export function urlsRetorno(cobroPublicId: string) {
