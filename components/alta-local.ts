@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 import {
   esColorMarca,
   esGiro,
@@ -34,8 +34,11 @@ export const PERFIL_OMITIDO: AltaGuardada = {
 const CLAVE = "payvro.alta";
 const EVENTO = "payvro-alta";
 
-let cacheCrudo: string | null | undefined;
-let cacheValor: AltaLocal | null = null;
+export type FotoAlta = { lista: boolean; alta: AltaLocal | null };
+
+const FOTO_SERVIDOR: FotoAlta = { lista: false, alta: null };
+let fotoCache: FotoAlta = FOTO_SERVIDOR;
+let fotoCrudo: string | null | undefined;
 
 export function decidirAlta(entrada: {
   hayConvex: boolean;
@@ -59,37 +62,29 @@ export function interpretarAlta(crudo: string | null): AltaLocal | null {
   return parsearAlta(crudo);
 }
 
-export function leerAltaLocal(): AltaLocal | null {
+export function leerFotoAlta(): FotoAlta {
   if (typeof window === "undefined") {
-    return null;
+    return FOTO_SERVIDOR;
   }
   const crudo = window.sessionStorage.getItem(CLAVE);
-  if (crudo === cacheCrudo) {
-    return cacheValor;
+  if (fotoCache.lista && crudo === fotoCrudo) {
+    return fotoCache;
   }
-  cacheCrudo = crudo;
-  cacheValor = interpretarAlta(crudo);
-  return cacheValor;
+  fotoCrudo = crudo;
+  fotoCache = { lista: true, alta: interpretarAlta(crudo) };
+  return fotoCache;
 }
 
 export function guardarAltaLocal(alta: AltaLocal): void {
-  const valor = alta === "pendiente" ? "pendiente" : JSON.stringify(alta);
+  const perfil = alta === "pendiente" ? null : { ...alta, nombre: alta.nombre.trim() };
+  const valor = perfil === null ? "pendiente" : JSON.stringify(perfil);
   window.sessionStorage.setItem(CLAVE, valor);
-  cacheCrudo = valor;
-  cacheValor = alta === "pendiente" ? "pendiente" : { ...alta, nombre: alta.nombre.trim() };
+  fotoCrudo = undefined;
   window.dispatchEvent(new Event(EVENTO));
 }
 
-export function useAltaLocal(): AltaLocal | null {
-  return useSyncExternalStore(suscribirAlta, leerAltaLocal, () => null);
-}
-
-export function useAltaLista(): boolean {
-  const [lista, setLista] = useState(false);
-  useEffect(() => {
-    setLista(true);
-  }, []);
-  return lista;
+export function useFotoAlta(): FotoAlta {
+  return useSyncExternalStore(suscribirAlta, leerFotoAlta, () => FOTO_SERVIDOR);
 }
 
 function decisionRemota(nombreRemoto: string | null | undefined): { mostrarAsistente: boolean; nombre: string } {
