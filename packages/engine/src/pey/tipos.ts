@@ -1,3 +1,5 @@
+// These are normalized internal records, not literal pey HTTP wire shapes. WP-OS-03 maps provider `id`, epoch-second dates,
+// nested `externalMetadata`, and `items` into these fields before policy evaluation.
 export type TipoPayable = "PAYMENT_LINK" | "API_CODI_QR" | "API_CODI_PN";
 export interface TransaccionPey {
   transactionId: string; status: "PENDING" | "PAID"; amount: number;

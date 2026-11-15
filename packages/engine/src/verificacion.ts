@@ -10,16 +10,16 @@ export type MotivoRevision = "monto_distinto" | "destino_distinto" | "metodo_no_
 export type Veredicto = { resultado: "sin_pago" } | { resultado: "coincide"; transacciones: TransaccionPey[] } | { resultado: "revisar"; motivo: MotivoRevision; transacciones: TransaccionPey[] };
 export function evaluar(esperado: Esperado, evidencia: Evidencia): Veredicto {
   if (evidencia.link?.status === "partial") return { resultado: "revisar", motivo: "parcial", transacciones: evidencia.transacciones };
-  if (esperado.tipo === "link" && evidencia.link && evidencia.link.clientReferenceId !== esperado.intentoPublicId)
-    return { resultado: "revisar", motivo: "destino_distinto", transacciones: [] };
   const payableType = esperado.tipo === "link" ? "PAYMENT_LINK" : "API_CODI_QR";
   const pagadas = evidencia.transacciones.filter((t) => t.status === "PAID" && t.currency === "MXN" && t.payableType === payableType && t.payableId === esperado.peyPayableId);
   if (!pagadas.length) return { resultado: "sin_pago" };
+  if (esperado.tipo === "link" && evidencia.link?.clientReferenceId !== esperado.intentoPublicId)
+    return { resultado: "revisar", motivo: "destino_distinto", transacciones: pagadas };
   const noPermitido = pagadas.find((t) => t.paymentMethod !== "CODI");
   if (noPermitido) return { resultado: "revisar", motivo: "metodo_no_permitido", transacciones: pagadas };
   const propina = pagadas.find((t) => centavosDesdePesos(t.amountBreakdown.tip) > 0);
   if (propina) return { resultado: "revisar", motivo: "con_propina", transacciones: pagadas };
-  if (esperado.destino === "bank_account_id" && evidencia.destinoConfirmado === false)
+  if (esperado.destino === "bank_account_id" && evidencia.destinoConfirmado !== true)
     return { resultado: "revisar", motivo: "destino_distinto", transacciones: pagadas };
   if (pagadas.length > 1) return { resultado: "revisar", motivo: "duplicado", transacciones: pagadas };
   const tx = pagadas[0];

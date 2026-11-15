@@ -33,4 +33,13 @@ describe("payment verification policy", () => {
     expect(evaluar(esperado, evidence([])).resultado).toBe("sin_pago");
     expect(evaluar(esperado, evidence([transaction()], { status: "paid", amount: 149, clientReferenceId: "other", metadata: {}, transactions: [] }))).toMatchObject({ resultado: "revisar", motivo: "destino_distinto" });
   });
+  it("requires a fetched link and exact reference before accepting its transaction", () => {
+    expect(evaluar(esperado, { transacciones: [transaction()] })).toMatchObject({ resultado: "revisar", motivo: "destino_distinto" });
+  });
+  it("requires positive QR destination confirmation from the trusted adapter", () => {
+    const qrExpected: Esperado = { ...esperado, tipo: "qr", destino: "bank_account_id" };
+    const qrTransaction = transaction({ payableType: "API_CODI_QR" });
+    expect(evaluar(qrExpected, { transacciones: [qrTransaction] })).toMatchObject({ resultado: "revisar", motivo: "destino_distinto" });
+    expect(evaluar(qrExpected, { transacciones: [qrTransaction], destinoConfirmado: true }).resultado).toBe("coincide");
+  });
 });
