@@ -1,6 +1,12 @@
 {
   "items": [
     {
+      "id": "01HXYZ1234567890ABCDEFGH00",
+      "status": "PAID",
+      "payableType": "UNRECOGNIZED",
+      "payableId": "01HXYZ1234567890ABCDEFGH00"
+    },
+    {
       "id": "01XXXXXXXXXXXXXXXXXXXXXXXX",
       "status": "PAID",
       "amount": 1.01,
@@ -21,7 +27,7 @@
           "payvro_cobro": "cob_example",
           "payvro_intento": "int_example",
           "payvro_modo": "live",
-          "orderId": "discarded"
+          "orderId": 42
         }
       }
     }

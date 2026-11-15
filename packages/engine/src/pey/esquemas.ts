@@ -82,6 +82,18 @@ function tipoPayable(value: unknown): TipoPayable {
   return invalid();
 }
 
+function validarPayableId(value: unknown, payableType: TipoPayable): string {
+  if (payableType === "API_CODI_QR") return validarQrId(value);
+  if (payableType === "API_CODI_PN") return validarPushId(value);
+  return validarUlid(value);
+}
+
+function identidadPayable(value: unknown): { payableType: TipoPayable; payableId: string } {
+  const wire = record(value);
+  const payableType = tipoPayable(wire.payableType);
+  return { payableType, payableId: validarPayableId(wire.payableId, payableType) };
+}
+
 function guardarCorrelacion(output: Record<string, string>, key: string, value: unknown): void {
   if (!CORRELATION_KEYS.includes(key as CorrelationKey)) return;
   const fieldValue = string(value, 128);
@@ -104,6 +116,7 @@ function metadataAllowlisted(value: unknown): Record<string, string> {
   if (external !== undefined && external !== null) {
     const externalRecord = record(external);
     for (const [key, fieldValue] of Object.entries(externalRecord)) {
+      if (!CORRELATION_KEYS.includes(key as CorrelationKey)) continue;
       if (typeof fieldValue !== "string") return invalid();
       guardarCorrelacion(output, key, fieldValue);
     }
@@ -123,8 +136,7 @@ export function normalizarTransaccionPey(value: unknown): TransaccionPey {
   const fee = amountBreakdown.fee === undefined ? 0 : pesos(amountBreakdown.fee, true);
   if (typeof wire.currency !== "string" || !/^[A-Z]{3}$/.test(wire.currency)) return invalid();
   if (wire.paymentMethod !== "CARD" && wire.paymentMethod !== "CODI") return invalid();
-  const payableType = tipoPayable(wire.payableType);
-  const payableId = payableType === "API_CODI_QR" ? validarQrId(wire.payableId) : payableType === "API_CODI_PN" ? validarPushId(wire.payableId) : validarUlid(wire.payableId);
+  const { payableType, payableId } = identidadPayable(wire);
   const dateCreated = fechaIsoDesdeSegundos(wire.dateCreated);
   const datePaid = wire.datePaid === undefined ? undefined : fechaIsoDesdeSegundos(wire.datePaid);
   if (status === "PAID" && datePaid === undefined) return invalid();
@@ -156,10 +168,17 @@ export function normalizarPaginaReferencias(value: unknown): PaginaReferenciasTr
   return { transactions, nextToken };
 }
 
-export function normalizarPaginaTransacciones(value: unknown, cuentaConfigurada = false): PaginaTransacciones {
+export function normalizarPaginaTransacciones(value: unknown): PaginaTransacciones {
   const { items, nextToken } = pageParts(value);
-  const transactions = items.map(normalizarTransaccionPey);
-  if (cuentaConfigurada && transactions.some((tx) => tx.status !== "PAID" || tx.paymentMethod !== "CODI" || (tx.payableType !== "API_CODI_QR" && tx.payableType !== "API_CODI_PN"))) return invalid();
+  const transactions: TransaccionPey[] = [];
+  for (const item of items) {
+    try {
+      identidadPayable(item);
+    } catch {
+      continue;
+    }
+    transactions.push(normalizarTransaccionPey(item));
+  }
   return { transactions, nextToken };
 }
 

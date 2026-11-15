@@ -3,8 +3,9 @@ import type { ActionCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
-import { crearSimulador } from "@payvro/engine";
-import type { SimStore, TransaccionPey, VariantePago } from "@payvro/engine";
+import { crearClientePey, crearSimulador } from "@payvro/engine";
+import type { PeyPuerto, SimStore, TransaccionPey, VariantePago } from "@payvro/engine";
+import { puertosMotor } from "../puertos";
 import type { Modo } from "./puertos";
 import { nuevoId } from "@payvro/engine/ids";
 
@@ -175,11 +176,25 @@ function crearStore(ctx: ActionCtx, negocioId: Id<"negocios">): SimStore {
   };
 }
 
-export function crearPeyPuerto(ctx: ActionCtx, negocioId: Id<"negocios">, modo: Modo): ReturnType<typeof crearSimulador> {
-  if (modo === "live") {
-    throw new ConvexError({ codigo: "NO_IMPLEMENTADO", mensaje: "El adaptador LIVE se implementa en WP-OS-03." });
-  }
-  return crearSimulador(crearStore(ctx, negocioId));
+export function crearPeyPuerto(ctx: ActionCtx, negocioId: Id<"negocios">, modo: Modo): PeyPuerto {
+  if (modo === "demo") return crearSimulador(crearStore(ctx, negocioId));
+  let clienteLive: Promise<PeyPuerto> | undefined;
+  const live = (): Promise<PeyPuerto> => {
+    clienteLive ??= puertosMotor.credencialPey(ctx, negocioId).then(({ apiKey, bankAccountId }) =>
+      crearClientePey({ apiKey, bankAccountId, fetch: globalThis.fetch, modo }),
+    );
+    return clienteLive;
+  };
+  return {
+    crearQr: async (entrada) => (await live()).crearQr(entrada),
+    crearLink: async (entrada) => (await live()).crearLink(entrada),
+    leerLink: async (id) => (await live()).leerLink(id),
+    leerTransaccion: async (id) => (await live()).leerTransaccion(id),
+    listarTransaccionesQr: async (id, nextToken) => (await live()).listarTransaccionesQr(id, nextToken),
+    listarTransacciones: async (nextToken) => (await live()).listarTransacciones(nextToken),
+    listarTransaccionesCuenta: async (nextToken) => (await live()).listarTransaccionesCuenta(nextToken),
+    leerCuenta: async () => (await live()).leerCuenta(),
+  };
 }
 
 export const simularYVerificar = internalAction({
@@ -194,8 +209,8 @@ export const simularYVerificar = internalAction({
     if (modoConfigurado !== "demo" || !datos || datos.negocioId !== args.negocioId || datos.modo !== "demo" || datos.modoNegocio !== "demo" || !datos.peyPayableId) {
       throw new ConvexError({ codigo: "SOLO_DEMO", mensaje: "La simulación solo está disponible en DEMO." });
     }
-    const puerto = crearPeyPuerto(ctx, args.negocioId, "demo");
-    await puerto.pagar(datos.peyPayableId, args.variante);
+    const simulador = crearSimulador(crearStore(ctx, args.negocioId));
+    await simulador.pagar(datos.peyPayableId, args.variante);
     return await ctx.runAction(internal.motor.verificar.verificarIntento, { intentoId: args.intentoId, origen: "simulador" });
   },
 });
