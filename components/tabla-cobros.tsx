@@ -9,8 +9,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { estadoParaDueno } from "@/lib/estados";
-import type { CobroLista } from "@/lib/demo-fixtures";
+import { estadoParaDueno, type EstadoCobro } from "@/lib/estados";
+
+export type CobroLista = {
+  publicId: string;
+  folio: number;
+  concepto: string;
+  montoCentavos: number;
+  estado: EstadoCobro;
+  alerta?: "pago_duplicado";
+  creadoEn: number;
+};
 
 export function TablaCobros({ cobros }: { cobros: readonly CobroLista[] }) {
   if (cobros.length === 0) {

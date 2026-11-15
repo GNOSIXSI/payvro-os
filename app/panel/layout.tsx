@@ -5,13 +5,12 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { PanelLateral } from "@/components/panel-lateral";
 import { api } from "@/convex/_generated/api";
-import { NEGOCIO_DEMO } from "@/lib/demo-fixtures";
 import { HAY_CONVEX } from "@/lib/hay-convex";
 
 export default function PanelLayout({ children }: { children: ReactNode }) {
   const ruta = usePathname() ?? "/panel";
   const negocio = useQuery(api.negocio.obtener, HAY_CONVEX ? {} : "skip");
-  const modo = HAY_CONVEX ? negocio?.modo : NEGOCIO_DEMO.modo;
+  const modo = HAY_CONVEX ? negocio?.modo : undefined;
 
   return (
     <div className="min-h-screen bg-paper md:grid md:grid-cols-[15rem_minmax(0,1fr)]">

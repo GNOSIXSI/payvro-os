@@ -2,11 +2,10 @@
 
 import { useQuery } from "convex/react";
 import { useParams } from "next/navigation";
+import { ConfiguraConvex } from "@/components/configura-convex";
 import { DetalleCobro, type DetalleCobroDatos } from "@/components/detalle-cobro";
 import type { EntradaBitacora } from "@/components/linea-de-tiempo";
 import { api } from "@/convex/_generated/api";
-import { BITACORA_DEMO } from "@/lib/demo-fixtures";
-import { cobroDetalleDemo } from "@/lib/demo-detalle";
 import { esEstadoCobro } from "@/lib/estados";
 import { HAY_CONVEX } from "@/lib/hay-convex";
 import { useSondeo } from "@/lib/sondeo";
@@ -20,33 +19,23 @@ export default function CobroDetallePage() {
       ? { cobroPublicId: publicId, paginationOpts: { numItems: 50, cursor: null } }
       : "skip",
   );
-  const cobro = HAY_CONVEX ? detalleDeRemoto(remoto) : cobroDetalleDemo(publicId);
-  const bitacora = HAY_CONVEX ? entradasDe(bitacoraRemota?.page) : bitacoraLocal(publicId);
+  const cobro = detalleDeRemoto(remoto);
   const espera = cobro?.estado === "esperando_pago";
   useSondeo(publicId, espera);
 
-  if (HAY_CONVEX && (remoto === undefined || bitacoraRemota === undefined)) {
+  if (!HAY_CONVEX) {
+    return <ConfiguraConvex />;
+  }
+  if (remoto === undefined || bitacoraRemota === undefined) {
     return <p className="text-muted">Cargando cobro…</p>;
   }
   if (!cobro) {
     return <p className="text-ink">Este cobro no existe o ya no está disponible.</p>;
   }
-  return <DetalleCobro cobro={cobro} bitacora={bitacora} />;
+  return <DetalleCobro cobro={cobro} bitacora={entradasDe(bitacoraRemota.page)} />;
 }
 
-function bitacoraLocal(publicId: string | undefined): EntradaBitacora[] {
-  return BITACORA_DEMO.filter((entrada) => entrada.cobroPublicId === publicId).map((entrada) => ({
-    tipo: entrada.tipo,
-    en: entrada.en,
-  }));
-}
-
-function entradasDe(
-  page: Array<{ tipo: string; en: number }> | undefined,
-): EntradaBitacora[] {
-  if (!page) {
-    return [];
-  }
+function entradasDe(page: Array<{ tipo: string; en: number }>): EntradaBitacora[] {
   return page.map((entrada) => ({ tipo: entrada.tipo, en: entrada.en }));
 }
 

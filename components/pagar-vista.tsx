@@ -10,7 +10,6 @@ import { QrCodi } from "@/components/qr-codi";
 import { Button } from "@/components/ui/button";
 import { api } from "@/convex/_generated/api";
 import { vistaPagadorPorEtiqueta, type VistaEstado } from "@/lib/estados";
-import { HAY_CONVEX } from "@/lib/hay-convex";
 import { mensajeDeError } from "@/lib/mensaje-error";
 
 export type CobroPublicoVista = {
@@ -153,9 +152,6 @@ function SimularPago({ publicId }: { publicId: string }) {
     setError(null);
     setPendiente(true);
     try {
-      if (!HAY_CONVEX) {
-        throw new Error("La simulación de pagos todavía no está disponible.");
-      }
       await simular({ publicId, variante: "exacto" });
     } catch (fallo) {
       setError(mensajeDeError(fallo));
