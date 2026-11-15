@@ -10,8 +10,8 @@ import { MODO_SIN_DEPLOYMENT } from "@/lib/modo";
 const hasConvexDeployment = Boolean(process.env.NEXT_PUBLIC_CONVEX_URL);
 
 export default function HomePage() {
-  const negocio = useQuery(api.negocio.obtener, hasConvexDeployment ? {} : "skip");
-  const modo = negocio?.modo ?? (hasConvexDeployment ? undefined : MODO_SIN_DEPLOYMENT);
+  const instalacion = useQuery(api.publico.instalacion, hasConvexDeployment ? {} : "skip");
+  const modo = instalacion?.modo ?? (hasConvexDeployment ? undefined : MODO_SIN_DEPLOYMENT);
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col items-center justify-center gap-8 px-6 py-16 text-center">
