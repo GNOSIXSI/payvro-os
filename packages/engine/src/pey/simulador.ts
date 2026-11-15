@@ -23,8 +23,9 @@ export function crearSimulador(store: SimStore): PeyPuerto & { pagar(id: string,
     crearLink: (e) => crear("link", e), crearQr: (e) => crear("qr", e),
     leerLink: async (id): Promise<EvidenciaLink> => { const p = store.getPayable(id); if (!p) throw new Error("NO_ENCONTRADO"); return { status: store.getTransactions(id).length ? "paid" : "pending", amount: aPesos(p.montoCentavos), clientReferenceId: p.intentoPublicId, metadata: { payvro_intento: p.intentoPublicId }, transactions: store.getTransactions(id).map((t) => ({ transactionId: t.transactionId })) }; },
     leerTransaccion: async (id) => { for (const p of allPayables()) { const tx = store.getTransactions(p); const found = tx.find((t) => t.transactionId === id); if (found) return found; } throw new Error("NO_ENCONTRADO"); },
-    listarTransaccionesQr: async (id) => ({ transactions: store.getTransactions(id) }),
-    listarTransacciones: async () => ({ transactions: allPayables().flatMap((id) => store.getTransactions(id)) }),
+    listarTransaccionesQr: async (id) => ({ transactions: store.getTransactions(id).map((t) => ({ transactionId: t.transactionId })), nextToken: null }),
+    listarTransacciones: async () => ({ transactions: allPayables().flatMap((id) => store.getTransactions(id)), nextToken: null }),
+    listarTransaccionesCuenta: async () => ({ transactions: allPayables().flatMap((id) => store.getTransactions(id)), nextToken: null }),
     leerCuenta: async () => ({ codiStatus: "ACTIVE" }),
     pagar: (id, variante) => {
       const p = store.getPayable(id); if (!p) throw new Error("NO_ENCONTRADO");

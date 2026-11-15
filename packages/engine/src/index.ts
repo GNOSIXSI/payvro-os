@@ -6,6 +6,8 @@ export type { EstadoCobro, EventoCobro, EstadoIntento, EventoIntento } from "./e
 export { evaluar } from "./verificacion";
 export type { Esperado, Evidencia, Veredicto, MotivoRevision } from "./verificacion";
 export { crearSimulador } from "./pey/simulador";
+export { crearClientePey, PeyClientError } from "./pey/cliente";
+export type { PeyClienteOpciones } from "./pey/cliente";
 export type { VariantePago, SimStore } from "./pey/simulador";
 export type { PeyPuerto, ResultadoCrear } from "./pey/puerto";
-export type { TransaccionPey, EvidenciaLink, PaginaTransacciones } from "./pey/tipos";
+export type { TransaccionPey, EvidenciaLink, PaginaTransacciones, PaginaReferenciasTransacciones, ReferenciaTransaccion } from "./pey/tipos";
