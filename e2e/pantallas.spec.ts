@@ -32,7 +32,10 @@ test("/panel shows the three tiles and a row per fixture state", async ({ page }
 test("/pagar fixture shows the business, the amount and waiting copy", async ({ page }) => {
   await page.goto(`/pagar/${COBRO_ESPERA}`);
 
-  await expect(page.getByRole("heading", { name: "Dulces Ana — Ejemplo" })).toBeVisible();
+  const nombre = page.getByRole("heading", { name: "Dulces Ana — Ejemplo" });
+  await expect(nombre).toBeVisible();
+  await expect(nombre).toHaveCSS("color", "rgb(255, 255, 255)");
+  await expect(page.locator("[aria-live='polite']")).toHaveCount(1);
   await expect(page.getByText("$149.00")).toBeVisible();
   await expect(page.getByText("Esperando pago", { exact: true })).toBeVisible();
   await expect(page.getByText("DEMO", { exact: true })).toBeVisible();
