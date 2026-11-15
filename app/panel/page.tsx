@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "convex/react";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ConfiguraConvex } from "@/components/configura-convex";
 import { GraficaIngresos } from "@/components/grafica-ingresos";
 import { TablaCobros, type CobroLista } from "@/components/tabla-cobros";
@@ -12,12 +12,18 @@ import { agrupaPorCreacion, leerMarcas, rotuloIngresos, serieIngresos } from "@/
 import { esEstadoCobro } from "@/lib/estados";
 import { HAY_CONVEX } from "@/lib/hay-convex";
 import {
-  estadoPaginasVacio,
-  incorporarSiNueva,
+  cursoresActivos,
+  serieDeRecibidas,
   TAMANO_PAGINA_SERIE,
   type EstadoPaginas,
   type PaginaLista,
 } from "@/lib/paginas-serie";
+
+type ResumenDia = {
+  verificadoHoyCentavos: number;
+  porLiberar: number;
+  enRevision: number;
+};
 
 export default function PanelPage() {
   const resumenRemoto = useQuery(api.cobros.resumenDelDia, HAY_CONVEX ? {} : "skip");
@@ -26,22 +32,40 @@ export default function PanelPage() {
   if (!HAY_CONVEX) {
     return <ConfiguraConvex />;
   }
-  if (resumenRemoto === undefined || !serie.completo) {
-    return <p className="text-muted">Cargando cobros…</p>;
-  }
 
-  const rotulo = rotuloIngresos({ porCreacion: agrupaPorCreacion(serie.filas), parcial: serie.parcial });
-  const recientes = serie.filas.slice(0, TAMANO_PAGINA_SERIE);
+  return (
+    <>
+      <Suscripciones cursores={serie.cursores} onPagina={serie.reportar} />
+      {resumenRemoto === undefined || !serie.estado.completo ? (
+        <p className="text-muted">Cargando cobros…</p>
+      ) : (
+        <InicioListo resumen={resumenRemoto} filas={serie.estado.filas} parcial={serie.estado.parcial} />
+      )}
+    </>
+  );
+}
+
+function InicioListo({
+  resumen,
+  filas,
+  parcial,
+}: {
+  resumen: ResumenDia;
+  filas: readonly CobroLista[];
+  parcial: boolean;
+}) {
+  const rotulo = rotuloIngresos({ porCreacion: agrupaPorCreacion(filas), parcial });
+  const recientes = filas.slice(0, TAMANO_PAGINA_SERIE);
 
   return (
     <div className="flex min-w-0 flex-col gap-8">
       <h1 className="font-display text-3xl font-semibold text-ink">Inicio</h1>
       <section className="grid gap-3 sm:grid-cols-3">
-        <TarjetaResumen titulo="Cobrado hoy" valor={<Monto centavos={resumenRemoto.verificadoHoyCentavos} />} />
-        <TarjetaResumen titulo="Por liberar" valor={resumenRemoto.porLiberar} />
-        <TarjetaResumen titulo="En revisión" valor={resumenRemoto.enRevision} />
+        <TarjetaResumen titulo="Cobrado hoy" valor={<Monto centavos={resumen.verificadoHoyCentavos} />} />
+        <TarjetaResumen titulo="Por liberar" valor={resumen.porLiberar} />
+        <TarjetaResumen titulo="En revisión" valor={resumen.enRevision} />
       </section>
-      <GraficaIngresos serie={serieIngresos(serie.filas)} rotulo={rotulo} />
+      <GraficaIngresos serie={serieIngresos(filas)} rotulo={rotulo} />
       <section id="cobros" className="flex min-w-0 flex-col gap-4">
         <h2 className="font-display text-xl font-semibold text-ink">Cobros recientes</h2>
         <TablaCobros cobros={recientes} />
@@ -50,20 +74,84 @@ export default function PanelPage() {
   );
 }
 
-function useSerieCobros(): EstadoPaginas<CobroLista> {
-  const [estado, setEstado] = useState(estadoPaginasVacio<CobroLista>());
-  const listaRemota = useQuery(
-    api.cobros.listar,
-    HAY_CONVEX ? { paginationOpts: { numItems: TAMANO_PAGINA_SERIE, cursor: estado.cursor } } : "skip",
+function Suscripciones({
+  cursores,
+  onPagina,
+}: {
+  cursores: readonly (string | null)[];
+  onPagina: (indice: number, pagina: PaginaLista<CobroLista>) => void;
+}) {
+  return (
+    <>
+      {cursores.map((cursor, indice) => (
+        <SuscripcionPagina
+          key={`${indice}:${cursor ?? ""}`}
+          indice={indice}
+          cursor={cursor}
+          onPagina={onPagina}
+        />
+      ))}
+    </>
   );
-  const pagina = paginaSiLista(listaRemota);
-  if (pagina !== null) {
-    const siguiente = incorporarSiNueva(estado, pagina);
-    if (siguiente !== estado) {
-      setEstado(siguiente);
+}
+
+function SuscripcionPagina({
+  indice,
+  cursor,
+  onPagina,
+}: {
+  indice: number;
+  cursor: string | null;
+  onPagina: (indice: number, pagina: PaginaLista<CobroLista>) => void;
+}) {
+  const lista = useQuery(
+    api.cobros.listar,
+    HAY_CONVEX ? { paginationOpts: { numItems: TAMANO_PAGINA_SERIE, cursor } } : "skip",
+  );
+  const pagina = paginaSiLista(lista);
+
+  useEffect(() => {
+    if (pagina) {
+      onPagina(indice, pagina);
     }
+  }, [pagina, indice, onPagina]);
+
+  return null;
+}
+
+function useSerieCobros(): {
+  estado: EstadoPaginas<CobroLista>;
+  cursores: (string | null)[];
+  reportar: (indice: number, pagina: PaginaLista<CobroLista>) => void;
+} {
+  const [paginas, setPaginas] = useState<(PaginaLista<CobroLista> | null)[]>([]);
+  const reportar = useCallback((indice: number, pagina: PaginaLista<CobroLista>) => {
+    setPaginas((previas) => reemplazarPagina(previas, indice, pagina));
+  }, []);
+
+  return { estado: serieDeRecibidas(paginas), cursores: cursoresActivos(paginas), reportar };
+}
+
+function reemplazarPagina(
+  previas: (PaginaLista<CobroLista> | null)[],
+  indice: number,
+  pagina: PaginaLista<CobroLista>,
+): (PaginaLista<CobroLista> | null)[] {
+  const actual = previas[indice] ?? null;
+  if (actual && firmaPagina(actual) === firmaPagina(pagina)) {
+    return previas;
   }
-  return estado;
+  const siguiente = previas.slice();
+  siguiente[indice] = pagina;
+  return siguiente;
+}
+
+function firmaPagina(pagina: PaginaLista<CobroLista>): string {
+  return JSON.stringify({
+    isDone: pagina.isDone,
+    continueCursor: pagina.continueCursor,
+    page: pagina.page,
+  });
 }
 
 function paginaSiLista(
