@@ -69,9 +69,15 @@ describe("LIVE pey QR client", () => {
     }
   });
 
-  it("maps a definite 4xx to rejected without exposing provider prose", async () => {
+  it("maps a definite non-rate-limit 4xx to rejected without exposing provider prose", async () => {
     const { pey, llamadas } = cliente([{ status: 400, body: { error: { message: "private provider text", type: "INVALID_AMOUNT", requestId: "req-example" } } }]);
     await expect(pey.crearQr(crearEvento)).resolves.toEqual({ tipo: "rechazado", httpStatus: 400, errorType: "INVALID_AMOUNT", requestId: "req-example" });
+    expect(llamadas).toHaveLength(1);
+  });
+
+  it("treats POST 429 as uncertain without retrying the charge", async () => {
+    const { pey, llamadas } = cliente([{ status: 429, body: { error: { message: "slow down", type: "RATE_LIMIT" } } }]);
+    await expect(pey.crearQr(crearEvento)).resolves.toMatchObject({ tipo: "incierto" });
     expect(llamadas).toHaveLength(1);
   });
 
@@ -160,6 +166,19 @@ describe("LIVE pey QR client", () => {
     }
   });
 
+  it("drops non-string untrusted external metadata but rejects non-string PAYVRO correlation ids", async () => {
+    const { pey } = cliente([{ status: 200, body: transaccion }]);
+    await expect(pey.leerTransaccion(TX_ID)).resolves.toMatchObject({
+      metadata: { payvro_cobro: "cob_example", payvro_intento: "int_example", payvro_modo: "live" },
+    });
+    const invalid = {
+      ...transaccion,
+      metadata: { ...transaccion.metadata, externalMetadata: { payvro_intento: 42 } },
+    };
+    const malformed = cliente([{ status: 200, body: invalid }]);
+    await expect(malformed.pey.leerTransaccion(TX_ID)).rejects.toMatchObject({ codigo: "PEY_FORMA_INESPERADA" });
+  });
+
   it("defaults only absent zero tip and fee components", async () => {
     const { pey } = cliente([{ status: 200, body: { ...transaccion, amount: 1, amountBreakdown: { base: 1 }, metadata: undefined } }]);
     await expect(pey.leerTransaccion(TX_ID)).resolves.toMatchObject({ amountBreakdown: { base: 1, tip: 0, fee: 0 } });
@@ -177,9 +196,10 @@ describe("LIVE pey QR client", () => {
     expect(llamadas).toHaveLength(1);
   });
 
-  it("reads configured-account transactions, encodes opaque tokens, and keeps items/null nextToken shape", async () => {
+  it("reads configured-account transactions, skips unknown payable shapes, and encodes opaque tokens", async () => {
     const { pey, llamadas } = cliente([{ status: 200, body: transaccionesCuenta }]);
     const pagina = await pey.listarTransaccionesCuenta("token&nextToken=evil/#?");
+    expect(pagina.transactions).toHaveLength(1);
     expect(pagina.transactions[0]).toMatchObject({ transactionId: TX_ID, payableId: QR_ID, payableType: "API_CODI_QR" });
     expect(pagina.nextToken).toBeNull();
     const url = new URL(llamadas[0].url);
@@ -221,16 +241,19 @@ describe("LIVE pey QR client", () => {
 
   it("fails closed for unsupported LIVE link and API-key-wide operations", async () => {
     const { pey, llamadas } = cliente([]);
-    await expect(pey.crearLink({ intentoPublicId: "int_example", cobroPublicId: "cob_example", montoCentavos: 1, successUrl: "https://example.invalid/s", backUrl: "https://example.invalid/b" })).rejects.toThrow("NO_IMPLEMENTADO");
-    await expect(pey.leerLink("01XXXXXXXXXXXXXXXXXXXXXXXX")).rejects.toThrow("NO_IMPLEMENTADO");
-    await expect(pey.listarTransacciones()).rejects.toThrow("NO_IMPLEMENTADO");
+    await expect(pey.crearLink({ intentoPublicId: "int_example", cobroPublicId: "cob_example", montoCentavos: 1, successUrl: "https://example.invalid/s", backUrl: "https://example.invalid/b" })).rejects.toThrow("PEY_CAPACIDAD_NO_DISPONIBLE");
+    await expect(pey.leerLink("01XXXXXXXXXXXXXXXXXXXXXXXX")).rejects.toThrow("PEY_CAPACIDAD_NO_DISPONIBLE");
+    await expect(pey.listarTransacciones()).rejects.toThrow("PEY_CAPACIDAD_NO_DISPONIBLE");
     expect(llamadas).toHaveLength(0);
   });
 
-  it("refuses construction outside LIVE mode and never leaks the key in errors", async () => {
+  it("refuses construction outside LIVE mode and never leaks the key through POST or GET errors", async () => {
     expect(() => crearClientePey({ apiKey: "sentinel-secret", bankAccountId: BANK_ID, fetch: fetchFalso([]).fetcher, modo: "demo" })).toThrow("MODO_INVALIDO");
-    const { pey } = cliente([new Error("network failed for key-sentinel-never-in-errors")]);
-    await expect(pey.crearQr(crearEvento)).resolves.toMatchObject({ tipo: "incierto", causa: "red" });
-    await expect(pey.leerTransaccion(TX_ID)).rejects.not.toThrow("key-sentinel-never-in-errors");
+    const post = cliente([new Error("network failed for key-sentinel-never-in-errors")]);
+    await expect(post.pey.crearQr(crearEvento)).resolves.toMatchObject({ tipo: "incierto", causa: "red" });
+    const get = cliente([new Error("network failed for key-sentinel-never-in-errors")]);
+    const error = await get.pey.leerTransaccion(TX_ID).then(() => null, (failure: unknown) => failure);
+    expect(String(error)).not.toContain("key-sentinel-never-in-errors");
+    expect(get.llamadas).toHaveLength(1);
   });
 });

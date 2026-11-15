@@ -1,7 +1,7 @@
 import { paginationOptsValidator, paginationResultValidator } from "convex/server";
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { resolverNegocio, resolverNegocioEscritura } from "./puertos";
+import { peyConfiguracionDisponible, resolverNegocio, resolverNegocioEscritura } from "./puertos";
 import { cancelarCobro, crearCobro, reintentarCobro } from "./motor/cobros";
 
 const estadoCobro = v.union(
@@ -42,7 +42,8 @@ export const crear = mutation({
   returns: v.object({ publicId: v.string(), folio: v.number(), estado: estadoCobro }),
   handler: async (ctx, args) => {
     const resolucion = await resolverNegocioEscritura(ctx);
-    return await crearCobro(ctx, args, resolucion.negocioId, resolucion.modo, resolucion.actor);
+    const peyConfigPresente = resolucion.modo === "live" ? peyConfiguracionDisponible() : true;
+    return await crearCobro(ctx, args, resolucion.negocioId, resolucion.modo, resolucion.actor, peyConfigPresente);
   },
 });
 
@@ -118,6 +119,7 @@ export const reintentar = mutation({
   returns: v.object({ publicId: v.string(), estado: estadoIntento }),
   handler: async (ctx, args) => {
     const resolucion = await resolverNegocioEscritura(ctx);
-    return await reintentarCobro(ctx, resolucion.negocioId, resolucion.modo, resolucion.actor, args.publicId, args.claveIdempotencia);
+    const peyConfigPresente = resolucion.modo === "live" ? peyConfiguracionDisponible() : true;
+    return await reintentarCobro(ctx, resolucion.negocioId, resolucion.modo, resolucion.actor, args.publicId, args.claveIdempotencia, peyConfigPresente);
   },
 });

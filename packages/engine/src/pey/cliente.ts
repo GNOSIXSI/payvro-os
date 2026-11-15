@@ -18,7 +18,7 @@ const TIMEOUT_MS = 10_000;
 const GET_RETRIES = 2;
 const GET_RETRY_DELAYS_MS = [100, 200] as const;
 
-type CodigoError = "NO_IMPLEMENTADO" | "MODO_INVALIDO" | "PEY_ARGUMENTO_INVALIDO" | "PEY_TIMEOUT" | "PEY_RED" | "PEY_RATE_LIMIT" | "PEY_HTTP" | "PEY_FORMA_INESPERADA";
+type CodigoError = "PEY_CAPACIDAD_NO_DISPONIBLE" | "MODO_INVALIDO" | "PEY_ARGUMENTO_INVALIDO" | "PEY_TIMEOUT" | "PEY_RED" | "PEY_RATE_LIMIT" | "PEY_HTTP" | "PEY_FORMA_INESPERADA";
 
 export class PeyClientError extends Error {
   readonly codigo: CodigoError;
@@ -177,6 +177,10 @@ export function crearClientePey(opciones: PeyClienteOpciones): PeyPuerto {
     } catch (error) {
       return { tipo: "incierto", causa: esErrorPey(error) && error.codigo === "PEY_TIMEOUT" ? "timeout" : "red" };
     }
+    if (response.status === 429) {
+      // The dispatch outcome is not safe to retry; leave the attempt uncertain.
+      return { tipo: "incierto", causa: "5xx" };
+    }
     if (response.status >= 400 && response.status < 500) {
       const info = normalizarError(await cuerpoJson(response, response.status).catch(() => null));
       return { tipo: "rechazado", httpStatus: response.status, errorType: info.errorType ?? "PEY_RECHAZADO", ...(info.requestId ? { requestId: info.requestId } : {}) };
@@ -209,7 +213,7 @@ export function crearClientePey(opciones: PeyClienteOpciones): PeyPuerto {
 
   async function listarTransaccionesCuenta(nextToken?: string): Promise<PaginaTransacciones> {
     const query = queryToken(nextToken);
-    return getJson(`/transaction/bank-account/${encodeURIComponent(bankAccountId)}${query}`, (body) => normalizarPaginaTransacciones(body, true));
+    return getJson(`/transaction/bank-account/${encodeURIComponent(bankAccountId)}${query}`, normalizarPaginaTransacciones);
   }
 
   function queryToken(nextToken?: string): string {
@@ -219,17 +223,17 @@ export function crearClientePey(opciones: PeyClienteOpciones): PeyPuerto {
     return `?${new URLSearchParams({ nextToken }).toString()}`;
   }
 
-  function noImplementado(): never {
-    throw new PeyClientError("NO_IMPLEMENTADO");
+  function capacidadNoDisponible(): never {
+    throw new PeyClientError("PEY_CAPACIDAD_NO_DISPONIBLE");
   }
 
   const cliente: PeyPuerto = {
     crearQr,
-    crearLink: async () => noImplementado(),
-    leerLink: async (_id: string): Promise<EvidenciaLink> => noImplementado(),
+    crearLink: async () => capacidadNoDisponible(),
+    leerLink: async (_id: string): Promise<EvidenciaLink> => capacidadNoDisponible(),
     leerTransaccion,
     listarTransaccionesQr,
-    listarTransacciones: async (_nextToken?: string): Promise<PaginaTransacciones> => noImplementado(),
+    listarTransacciones: async (_nextToken?: string): Promise<PaginaTransacciones> => capacidadNoDisponible(),
     listarTransaccionesCuenta,
     leerCuenta: async () => getJson(`/bank-account/${encodeURIComponent(bankAccountId)}`, (body) => normalizarCuenta(body, bankAccountId)),
   };
