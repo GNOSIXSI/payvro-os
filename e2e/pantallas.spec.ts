@@ -50,7 +50,7 @@ test("payer page does not mention CLABE, keys or api key", async ({ page }) => {
   await expect(page.getByText(/CLABE|llave|api key/i)).toHaveCount(0);
 });
 
-test("keyboard can open nuevo cobro and copy a payer link", async ({ page, context }) => {
+test("keyboard can open nuevo cobro and sees the payer link is unavailable", async ({ page }) => {
   await page.goto("/panel/nuevo");
   await page.getByLabel("Concepto").fill("Pedido de prueba");
   await page.getByLabel("Monto").fill("0.01");
@@ -59,9 +59,8 @@ test("keyboard can open nuevo cobro and copy a payer link", async ({ page, conte
 
   await page.goto(`/panel/cobros/${COBRO_ESPERA}`);
   await expect(page.getByRole("button", { name: "Mostrar QR" })).toBeVisible();
-  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
-  await page.getByRole("button", { name: "Copiar link" }).press("Enter");
-  await expect(page.getByRole("button", { name: "Copiado" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Copiar link" })).toBeDisabled();
+  await expect(page.getByText("El link de pago aún no está disponible")).toBeVisible();
 });
 
 test("panel and alta call the Convex stubs", async ({ page }) => {
