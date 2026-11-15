@@ -17,7 +17,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "build": "next build",
-    "e2e": "cross-env NEXT_PUBLIC_CONVEX_URL= NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY= npm run build && playwright install chromium && cross-env NEXT_PUBLIC_CONVEX_URL= NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY= playwright test",
+    "e2e": "cross-env NEXT_PUBLIC_CONVEX_URL= NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY= npm run build && playwright install chromium && cross-env NEXT_PUBLIC_CONVEX_URL= NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY= playwright test --workers=1",
     "secrets": "gitleaks dir . --redact --no-banner && gitleaks git . --log-opts=--all --redact --no-banner",
     "gate": "bash scripts/gate.sh"
   },
