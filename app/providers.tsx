@@ -4,7 +4,6 @@ import { ClerkProvider, useAuth } from "@clerk/nextjs";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
 import type { ReactNode } from "react";
-import { AsegurarNegocio } from "@/components/asegurar-negocio";
 
 const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL || "https://placeholder.convex.cloud";
 const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
@@ -14,17 +13,13 @@ export function Providers({ children }: Readonly<{ children: ReactNode }>) {
   if (clerkPublishableKey) {
     return (
       <ClerkProvider publishableKey={clerkPublishableKey}>
-        <ConvexWithClerk>
-          <AsegurarNegocio>{children}</AsegurarNegocio>
-        </ConvexWithClerk>
+        <ConvexWithClerk>{children}</ConvexWithClerk>
       </ClerkProvider>
     );
   }
 
   return (
-    <ConvexProvider client={convex}>
-      <AsegurarNegocio>{children}</AsegurarNegocio>
-    </ConvexProvider>
+    <ConvexProvider client={convex}>{children}</ConvexProvider>
   );
 }
 

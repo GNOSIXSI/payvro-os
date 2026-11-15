@@ -5,6 +5,14 @@ import { modo } from "./puertos";
 import { esId, nuevoId } from "@payvro/engine/ids";
 import { consumirLimite } from "./motor/limites";
 
+const modoInstalacion = v.union(v.literal("demo"), v.literal("live"));
+
+export const instalacion = query({
+  args: {},
+  returns: v.object({ modo: modoInstalacion }),
+  handler: async () => ({ modo: modo() }),
+});
+
 const estadoVisible = (estado: string): string => {
   switch (estado) {
     case "pagado_verificado":
