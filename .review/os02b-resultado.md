@@ -60,7 +60,7 @@ Vitest itself could not start (`vitest: not found`), so the following are direct
 | `npm run lint` | 127 | `eslint: not found`. |
 | `npm test` | 127 | `vitest: not found`. |
 | `npm run build` | 127 | `next: not found`. |
-| `npm run gate` | 2 | Stopped at its first step, `npm run typecheck`; same missing-package errors. Lint, tests, build, E2E, and gate secrets stage were not reached by this gate run. |
+| `npm run gate` | 1 | Stopped at its first step, `npm run typecheck`; same missing-package errors. Lint, tests, build, E2E, and gate secrets stage were not reached by this gate run. |
 | `npm run secrets` | 0 | Gitleaks scanned worktree and 52 commits; no leaks found. |
 | `~/.local/bin/convex-locked.sh "$PWD" -- codegen` | 3 | Required pinned Convex binary is absent at this worktree's `node_modules/.bin/convex`; no `npx` fallback used. |
 | `test ! -d convex/_stub` | 0 | Stub directory removed. |
