@@ -1,104 +1,69 @@
-// STUB WP-OS-01 — replaced by WP-OS-02
 import { paginationOptsValidator, paginationResultValidator } from "convex/server";
 import { v } from "convex/values";
-import { BITACORA_FIXTURE } from "./_stub/fixtures";
 import { query } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
+import { resolverNegocio } from "./puertos";
 
-const estadoCobroValidator = v.union(
-  v.literal("borrador"),
-  v.literal("esperando_pago"),
-  v.literal("pagado_verificado"),
-  v.literal("liberado"),
-  v.literal("expirado"),
-  v.literal("cancelado"),
-  v.literal("en_revision"),
+const estadoCobro = v.union(
+  v.literal("borrador"), v.literal("esperando_pago"), v.literal("pagado_verificado"), v.literal("liberado"),
+  v.literal("expirado"), v.literal("cancelado"), v.literal("en_revision"),
 );
-
-const actorTipoValidator = v.union(
-  v.literal("dueno"),
-  v.literal("sistema"),
-  v.literal("pey"),
-  v.literal("agente"),
-  v.literal("pagador"),
-  v.literal("simulador"),
-);
-
-const detalleValidator = v.object({
-  motivo: v.optional(
-    v.union(
-      v.literal("monto_distinto"),
-      v.literal("destino_distinto"),
-      v.literal("metodo_no_permitido"),
-      v.literal("con_propina"),
-      v.literal("duplicado"),
-      v.literal("pago_tardio"),
-      v.literal("parcial"),
-    ),
-  ),
-  httpStatus: v.optional(v.number()),
-  requestId: v.optional(v.string()),
-  conteo: v.optional(v.number()),
+const actorTipo = v.union(v.literal("dueno"), v.literal("sistema"), v.literal("pey"), v.literal("agente"), v.literal("pagador"), v.literal("simulador"));
+const detalle = v.object({
+  motivo: v.optional(v.union(
+    v.literal("monto_distinto"), v.literal("destino_distinto"), v.literal("metodo_no_permitido"),
+    v.literal("con_propina"), v.literal("duplicado"), v.literal("pago_tardio"), v.literal("parcial"),
+  )),
+  httpStatus: v.optional(v.number()), requestId: v.optional(v.string()), conteo: v.optional(v.number()),
 });
-
-const entradaBitacoraValidator = v.object({
-  publicId: v.string(),
-  seq: v.number(),
-  tipo: v.union(
-    v.literal("cobro.creado"),
-    v.literal("intento.reservado"),
-    v.literal("pey.llamada"),
-    v.literal("intento.creado"),
-    v.literal("intento.incierto"),
-    v.literal("intento.fallido"),
-    v.literal("intento.descartado"),
-    v.literal("evento.recibido"),
-    v.literal("pago.verificado"),
-    v.literal("pago.no_coincide"),
-    v.literal("pago.duplicado"),
-    v.literal("cobro.en_revision"),
-    v.literal("cobro.liberado"),
-    v.literal("cobro.expirado"),
-    v.literal("cobro.cancelado"),
-    v.literal("negocio.actualizado"),
-    v.literal("cobros.pausados"),
-  ),
-  cobroPublicId: v.string(),
-  actor: v.object({ tipo: actorTipoValidator, id: v.optional(v.string()) }),
-  estadoAntes: v.optional(estadoCobroValidator),
-  estadoDespues: v.optional(estadoCobroValidator),
-  detalle: detalleValidator,
-  en: v.number(),
+const entrada = v.object({
+  publicId: v.string(), seq: v.number(), tipo: v.string(), cobroPublicId: v.string(),
+  actor: v.object({ tipo: actorTipo, id: v.optional(v.string()) }),
+  estadoAntes: v.optional(estadoCobro), estadoDespues: v.optional(estadoCobro), detalle, en: v.number(),
 });
+const motivoPublico = new Set([
+  "monto_distinto", "destino_distinto", "metodo_no_permitido", "con_propina", "duplicado", "pago_tardio", "parcial",
+]);
+
+function detallePublico(valor: Record<string, unknown>) {
+  return {
+    ...(typeof valor.motivo === "string" && motivoPublico.has(valor.motivo) ? { motivo: valor.motivo as "monto_distinto" | "destino_distinto" | "metodo_no_permitido" | "con_propina" | "duplicado" | "pago_tardio" | "parcial" } : {}),
+    ...(typeof valor.httpStatus === "number" ? { httpStatus: valor.httpStatus } : {}),
+    ...(typeof valor.requestId === "string" ? { requestId: valor.requestId } : {}),
+    ...(typeof valor.conteo === "number" ? { conteo: valor.conteo } : {}),
+  };
+}
 
 export const bitacora = query({
-  args: {
-    cobroPublicId: v.optional(v.string()),
-    paginationOpts: paginationOptsValidator,
-  },
-  returns: paginationResultValidator(entradaBitacoraValidator),
-  handler: async (_ctx, args) => {
-    const registros = [];
-
-    for (const entrada of BITACORA_FIXTURE) {
-      if (args.cobroPublicId && entrada.cobroPublicId !== args.cobroPublicId) {
-        continue;
+  args: { cobroPublicId: v.optional(v.string()), paginationOpts: paginationOptsValidator },
+  returns: paginationResultValidator(entrada),
+  handler: async (ctx, args) => {
+    const { negocioId, modo } = await resolverNegocio(ctx);
+    let cobroId: Id<"cobros"> | undefined;
+    if (args.cobroPublicId !== undefined) {
+      const cobro = await ctx.db.query("cobros").withIndex("by_publicId", (q) => q.eq("publicId", args.cobroPublicId!)).unique();
+      if (!cobro || cobro.negocioId !== negocioId || cobro.modo !== modo) {
+        return { page: [], isDone: true, continueCursor: args.paginationOpts.cursor ?? "", splitCursor: null, pageStatus: null };
       }
-      registros.push(entrada);
+      cobroId = cobro._id;
     }
-
-    const cursor = args.paginationOpts.cursor;
-    const parsedOffset = cursor === null ? 0 : Number(cursor);
-    const offset = Number.isSafeInteger(parsedOffset) && parsedOffset >= 0 ? parsedOffset : 0;
-    const limit = Math.max(1, args.paginationOpts.numItems);
-    const page = registros.slice(offset, offset + limit);
-    const nextOffset = offset + page.length;
-
-    return {
-      page,
-      isDone: nextOffset >= registros.length,
-      continueCursor: String(nextOffset),
-      splitCursor: null,
-      pageStatus: null,
-    };
+    const consulta = cobroId
+      ? ctx.db.query("bitacora").withIndex("by_cobro_seq", (q) => q.eq("cobroId", cobroId!)).order("asc")
+      : ctx.db.query("bitacora").withIndex("by_negocio_seq", (q) => q.eq("negocioId", negocioId)).order("asc");
+    const pagina = await consulta.paginate(args.paginationOpts);
+    const filas = [];
+    for (const fila of pagina.page) {
+      if (fila.negocioId !== negocioId || !fila.cobroId) continue;
+      const cobro = await ctx.db.get(fila.cobroId);
+      if (!cobro || cobro.negocioId !== negocioId) continue;
+      filas.push({
+        publicId: fila.publicId, seq: fila.seq, tipo: fila.tipo, cobroPublicId: cobro.publicId,
+        actor: fila.actor as { tipo: "dueno" | "sistema" | "pey" | "agente" | "pagador" | "simulador"; id?: string },
+        ...(fila.estadoAntes ? { estadoAntes: fila.estadoAntes } : {}),
+        ...(fila.estadoDespues ? { estadoDespues: fila.estadoDespues } : {}),
+        detalle: detallePublico(fila.detalle as Record<string, unknown>), en: fila.en,
+      });
+    }
+    return { ...pagina, page: filas };
   },
 });
