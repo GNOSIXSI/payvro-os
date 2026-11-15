@@ -1,2 +1,11 @@
 [extend]
 useDefault = true
+
+# .convex/ is gitignored: it holds the state of the LOCAL Convex backend that
+# `convex codegen` starts during the factory close (an ephemeral admin key that
+# never leaves the machine). `gitleaks dir .` also reads ignored files, so without
+# this every close fails on a file git never sees. Only that folder is exempt:
+# a secret in .env.local or any other path is still reported.
+[[allowlists]]
+description = "local Convex backend state (gitignored)"
+paths = ['''(^|/)\.convex/''']
