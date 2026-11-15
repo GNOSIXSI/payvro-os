@@ -46,6 +46,10 @@ function mismaTransaccion(a: TransaccionPey, b: TransaccionPey): boolean {
     a.amountBreakdown.fee === b.amountBreakdown.fee && a.datePaid === b.datePaid;
 }
 
+function idVistoSinConfirmar(objetivo: TransaccionPey, fila: TransaccionPey): boolean {
+  return fila.transactionId === objetivo.transactionId && fila.status !== "PAID";
+}
+
 async function leaseSondeoDisponible(ctx: ActionCtx, intentoId: Id<"intentos">, leaseId?: string): Promise<boolean> {
   if (!leaseId) return true;
   return Boolean(await ctx.runMutation(internal.motor.verificar.prepararTickSondeo, { intentoId, leaseId }));
@@ -290,12 +294,15 @@ export const verificarIntento = internalAction({
           const encontrados = new Set<string>();
           let token: string | undefined;
           let listaCompleta = false;
+          let pruebaInconclusa = false;
           for (let paginaNumero = 0; paginaNumero < MAX_PAGINAS_CUENTA; paginaNumero += 1) {
             if (!(await leaseSondeoDisponible(ctx, args.intentoId, args.leaseId))) return { ok: false, resultado: "sondeo_deteniendo" };
             const pagina = await puerto.listarTransaccionesCuenta(token);
+            if (pagina.descartadas > 0) pruebaInconclusa = true;
             for (const row of pagina.transactions) {
               const objetivo = relevantes.find((tx) => tx.transactionId === row.transactionId);
               if (objetivo && mismaTransaccion(objetivo, row)) encontrados.add(row.transactionId);
+              else if (objetivo && idVistoSinConfirmar(objetivo, row)) pruebaInconclusa = true;
             }
             if (relevantes.every((tx) => encontrados.has(tx.transactionId))) {
               listaCompleta = true;
@@ -307,6 +314,10 @@ export const verificarIntento = internalAction({
               listaCompleta = true;
               break;
             }
+          }
+          if (!destinoConfirmado && pruebaInconclusa) {
+            await ctx.runMutation(internal.motor.verificar.registrarLectura, { intentoId: args.intentoId, exitosa: false });
+            return { ok: false, resultado: "diferida" };
           }
           if (!listaCompleta) {
             await ctx.runMutation(internal.motor.verificar.registrarLectura, { intentoId: args.intentoId, exitosa: false });
