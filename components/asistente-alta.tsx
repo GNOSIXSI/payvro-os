@@ -7,11 +7,10 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   GIROS_ALTA,
-  PERFIL_OMITIDO,
+  cerrarAlta,
   decidirAlta,
   debeSalirDeBienvenida,
   guardarAltaLocal,
-  seguirTrasFallo,
   useFotoAlta,
   type AltaGuardada,
 } from "@/components/alta-local";
@@ -86,8 +85,8 @@ function PasosAlta() {
           onNombre={setNombre}
           onColor={setColor}
           onAtras={() => setPaso(2)}
-          onListo={(perfil) => void cerrar(perfil, true)}
-          onOmitir={() => void cerrar(PERFIL_OMITIDO, false)}
+          onListo={(perfil) => void cerrar.guardar(perfil)}
+          onOmitir={cerrar.omitir}
         />
       ) : null}
     </main>
@@ -255,6 +254,7 @@ function AccionesAlta({
       <Button type="button" variant="ghost" disabled={pendiente} onClick={onOmitir}>
         Omitir
       </Button>
+      <p className="text-sm text-muted">Omitir no guarda el perfil en el servidor.</p>
       <Button type="button" variant="outline" onClick={onAtras}>
         Atrás
       </Button>
@@ -292,49 +292,63 @@ function enviarNombre(
 function useCierreAlta(
   setError: (valor: string | null) => void,
   setPendiente: (valor: boolean) => void,
-): (perfil: AltaGuardada, bloquearSiFalla: boolean) => Promise<void> {
+): { guardar: (perfil: AltaGuardada) => Promise<void>; omitir: () => void } {
   const router = useRouter();
   const actualizar = useMutation(api.negocio.actualizarPerfil);
-  return async (perfil, bloquearSiFalla) => {
-    const recortado = perfil.nombre.trim();
-    if (recortado.length === 0 || recortado.length > 40) {
-      setError("El nombre es obligatorio y no puede pasar de 40 caracteres.");
+  const aplicar = (efecto: ReturnType<typeof cerrarAlta>, fallo: unknown | null, perfil: AltaGuardada | null) => {
+    if (efecto.mostrarError) {
+      setError(mensajeDeError(fallo));
       return;
     }
-    setError(null);
-    setPendiente(true);
-    const siguio = await guardarEnServidor(
-      { ...perfil, nombre: recortado },
-      bloquearSiFalla,
-      actualizar,
-      setError,
-    );
-    setPendiente(false);
-    if (!siguio) {
-      return;
+    if (efecto.marcarOmitido) {
+      guardarAltaLocal("omitido");
+    } else if (perfil !== null && !HAY_CONVEX) {
+      guardarAltaLocal(perfil);
     }
-    guardarAltaLocal({ ...perfil, nombre: recortado });
-    router.push("/panel");
+    if (efecto.navegar) {
+      router.push("/panel");
+    }
+  };
+
+  return {
+    omitir: () => {
+      setError(null);
+      aplicar(cerrarAlta("omitir", null), null, null);
+    },
+    guardar: async (perfil) => {
+      const listo = perfilListo(perfil);
+      if (listo === null) {
+        setError("El nombre es obligatorio y no puede pasar de 40 caracteres.");
+        return;
+      }
+      setError(null);
+      setPendiente(true);
+      const fallo = await falloAlGuardar(listo, actualizar);
+      setPendiente(false);
+      aplicar(cerrarAlta("guardar", fallo), fallo, listo);
+    },
   };
 }
 
-async function guardarEnServidor(
+function perfilListo(perfil: AltaGuardada): AltaGuardada | null {
+  const nombre = perfil.nombre.trim();
+  if (nombre.length === 0 || nombre.length > 40) {
+    return null;
+  }
+  return { ...perfil, nombre };
+}
+
+async function falloAlGuardar(
   perfil: AltaGuardada,
-  bloquearSiFalla: boolean,
   actualizar: (args: { nombre: string; giro: Giro; colorMarca: ColorMarca }) => Promise<{ ok: boolean }>,
-  setError: (valor: string | null) => void,
-): Promise<boolean> {
+): Promise<unknown | null> {
   if (!HAY_CONVEX) {
-    return true;
+    return null;
   }
   try {
     await actualizar({ nombre: perfil.nombre, giro: perfil.giro, colorMarca: perfil.colorMarca });
-    return true;
+    return null;
   } catch (fallo: unknown) {
-    if (!seguirTrasFallo(bloquearSiFalla, fallo)) {
-      setError(mensajeDeError(fallo));
-      return false;
-    }
-    return true;
+    return fallo;
   }
 }

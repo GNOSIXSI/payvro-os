@@ -4,7 +4,7 @@ import path from "node:path";
 import { COBROS_FIXTURE } from "../convex/_stub/fixtures";
 import { formatoMXN } from "../lib/formato";
 import { serieIngresos } from "../lib/serie";
-import { recordarConsulta, vaciarNombreNegocio } from "./rewriter-nombre";
+import { crearPuenteNombre, observarClienteNombre, responderNombre, type PuenteNombre } from "./rewriter-nombre";
 
 const NUBE = ["Plantillas", "Mostrador", "Plan", "Agente"] as const;
 
@@ -15,8 +15,8 @@ test("negocio sin nombre redirige /panel a /bienvenida", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Cuenta" })).toBeVisible();
 });
 
-test("completar los 3 pasos deja el nombre en el shell", async ({ page }) => {
-  await negocioSinNombre(page);
+test("completar los 3 pasos persiste el nombre que devolvió el servidor", async ({ page }) => {
+  const puente = await negocioSinNombre(page, true);
   await page.goto("/panel");
   await expect(page).toHaveURL(/\/bienvenida$/);
   await page.getByRole("button", { name: "Continuar" }).click();
@@ -27,6 +27,25 @@ test("completar los 3 pasos deja el nombre en el shell", async ({ page }) => {
   await page.getByRole("button", { name: "Ir a mi panel" }).click();
   await expect(page).toHaveURL(/\/panel$/);
   await expect(visible(page, "Negocio de ejemplo")).toBeVisible();
+  expect(puente.nombreAceptado).toBe("Negocio de ejemplo");
+  await page.evaluate(() => sessionStorage.removeItem("payvro.alta"));
+  await page.reload();
+  await expect(page).toHaveURL(/\/panel$/);
+  await expect(visible(page, "Negocio de ejemplo")).toBeVisible();
+});
+
+test("si el servidor rechaza el perfil, el formulario sigue y no queda guardado", async ({ page }) => {
+  await negocioSinNombre(page, false);
+  await page.goto("/panel");
+  await expect(page).toHaveURL(/\/bienvenida$/);
+  await page.getByRole("button", { name: "Continuar" }).click();
+  await page.getByRole("button", { name: "Continuar" }).click();
+  await page.getByLabel("Nombre").fill("Negocio de ejemplo");
+  await page.getByRole("button", { name: "Ir a mi panel" }).click();
+  await expect(page).toHaveURL(/\/bienvenida$/);
+  await expect(page.getByRole("heading", { name: "Tu negocio" })).toBeVisible();
+  await expect(page.getByRole("alert")).toHaveText("La actualización del perfil todavía no está disponible.");
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem("payvro.alta"))).toBeNull();
 });
 
 test("omitir tambien llega al panel y no vuelve a pedir el alta", async ({ page }) => {
@@ -37,6 +56,7 @@ test("omitir tambien llega al panel y no vuelve a pedir el alta", async ({ page 
   await expect(page.getByRole("heading", { name: "Elige tu giro" })).toBeVisible();
   await page.getByRole("button", { name: "Continuar" }).click();
   await expect(page.getByRole("heading", { name: "Tu negocio" })).toBeVisible();
+  await expect(page.getByText("Omitir no guarda el perfil en el servidor.")).toBeVisible();
   await page.getByRole("button", { name: "Omitir" }).click();
   await expect(page).toHaveURL(/\/panel$/);
   await expect(visible(page, "Mi negocio")).toBeVisible();
@@ -68,7 +88,7 @@ test("con nombre, /panel no redirige y muestra inicio, grafica, tarjetas y DEMO"
 });
 
 test("el teclado completa el alta y abre nuevo cobro", async ({ page }) => {
-  await negocioSinNombre(page);
+  await negocioSinNombre(page, true);
   await page.goto("/panel");
   await expect(page).toHaveURL(/\/bienvenida$/);
   await page.getByRole("button", { name: "Continuar" }).focus();
@@ -97,22 +117,31 @@ test("bienvenida y panel no hacen scroll horizontal a 375 y 1280", async ({ page
   }
 });
 
-async function negocioSinNombre(page: Page): Promise<void> {
-  const ids = new Set<number>();
+async function negocioSinNombre(page: Page, aceptarGuardado = false): Promise<PuenteNombre> {
+  const puente = crearPuenteNombre();
   await page.routeWebSocket(/.*/, (socket) => {
     const servidor = socket.connectToServer();
     socket.onMessage((mensaje) => {
       const texto = textoJson(mensaje);
       if (texto) {
-        recordarConsulta(ids, texto);
+        observarClienteNombre(puente, texto);
       }
       servidor.send(mensaje);
     });
     servidor.onMessage((mensaje) => {
       const texto = textoJson(mensaje);
-      socket.send(texto ? vaciarNombreNegocio(ids, texto) : mensaje);
+      if (!texto) {
+        socket.send(mensaje);
+        return;
+      }
+      const salida = responderNombre(puente, texto, aceptarGuardado);
+      if (salida.extra) {
+        socket.send(salida.extra);
+      }
+      socket.send(salida.mensaje);
     });
   });
+  return puente;
 }
 
 function textoJson(mensaje: string | Buffer): string | null {

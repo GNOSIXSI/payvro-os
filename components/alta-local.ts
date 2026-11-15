@@ -14,7 +14,20 @@ export type AltaGuardada = {
   colorMarca: ColorMarca;
 };
 
-export type AltaLocal = AltaGuardada | "pendiente";
+export type AltaLocal = AltaGuardada | "pendiente" | "omitido";
+
+export function cerrarAlta(
+  accion: "guardar" | "omitir",
+  fallo: unknown | null,
+): { navegar: boolean; marcarOmitido: boolean; mostrarError: boolean } {
+  if (accion === "omitir") {
+    return { navegar: true, marcarOmitido: true, mostrarError: false };
+  }
+  if (fallo !== null) {
+    return { navegar: false, marcarOmitido: false, mostrarError: true };
+  }
+  return { navegar: true, marcarOmitido: false, mostrarError: false };
+}
 
 export const GIROS_ALTA: readonly { valor: Giro; etiqueta: string }[] = [
   { valor: "social", etiqueta: "Vendo por WhatsApp/Instagram" },
@@ -52,13 +65,6 @@ export function decidirAlta(entrada: {
   return decisionLocal(entrada.altaLocal, entrada.nombreDemo);
 }
 
-export function seguirTrasFallo(bloquearSiFalla: boolean, fallo: unknown): boolean {
-  if (!bloquearSiFalla) {
-    return true;
-  }
-  return codigoDeFallo(fallo) === "NO_IMPLEMENTADO";
-}
-
 export function debeSalirDeBienvenida(entrada: {
   lista: boolean;
   esperandoPerfil: boolean;
@@ -74,8 +80,8 @@ export function interpretarAlta(crudo: string | null): AltaLocal | null {
   if (crudo === null) {
     return null;
   }
-  if (crudo === "pendiente") {
-    return "pendiente";
+  if (crudo === "pendiente" || crudo === "omitido") {
+    return crudo;
   }
   return parsearAlta(crudo);
 }
@@ -94,9 +100,7 @@ export function leerFotoAlta(): FotoAlta {
 }
 
 export function guardarAltaLocal(alta: AltaLocal): void {
-  const perfil = alta === "pendiente" ? null : { ...alta, nombre: alta.nombre.trim() };
-  const valor = perfil === null ? "pendiente" : JSON.stringify(perfil);
-  window.sessionStorage.setItem(CLAVE, valor);
+  window.sessionStorage.setItem(CLAVE, serializarAlta(alta));
   fotoCrudo = undefined;
   window.dispatchEvent(new Event(EVENTO));
 }
@@ -116,30 +120,10 @@ function decisionRemota(
   if (remoto.length > 0) {
     return { mostrarAsistente: false, nombre: remoto };
   }
-  const local = nombreLocalTerminado(altaLocal);
-  if (local !== null) {
-    return { mostrarAsistente: false, nombre: local };
+  if (altaLocal === "omitido") {
+    return { mostrarAsistente: false, nombre: PERFIL_OMITIDO.nombre };
   }
   return { mostrarAsistente: true, nombre: "" };
-}
-
-function nombreLocalTerminado(altaLocal: AltaLocal | null): string | null {
-  if (altaLocal === null || altaLocal === "pendiente") {
-    return null;
-  }
-  const nombre = altaLocal.nombre.trim();
-  return nombre.length > 0 ? nombre : null;
-}
-
-function codigoDeFallo(fallo: unknown): string | null {
-  if (typeof fallo !== "object" || fallo === null || !("data" in fallo)) {
-    return null;
-  }
-  const data = fallo.data;
-  if (typeof data !== "object" || data === null || !("codigo" in data)) {
-    return null;
-  }
-  return typeof data.codigo === "string" ? data.codigo : null;
 }
 
 function decisionLocal(
@@ -149,10 +133,20 @@ function decisionLocal(
   if (altaLocal === "pendiente") {
     return { mostrarAsistente: true, nombre: "" };
   }
+  if (altaLocal === "omitido") {
+    return { mostrarAsistente: false, nombre: PERFIL_OMITIDO.nombre };
+  }
   if (altaLocal && altaLocal.nombre.trim().length > 0) {
     return { mostrarAsistente: false, nombre: altaLocal.nombre.trim() };
   }
   return { mostrarAsistente: false, nombre: nombreDemo };
+}
+
+function serializarAlta(alta: AltaLocal): string {
+  if (alta === "pendiente" || alta === "omitido") {
+    return alta;
+  }
+  return JSON.stringify({ ...alta, nombre: alta.nombre.trim() });
 }
 
 function parsearAlta(crudo: string): AltaGuardada | null {
