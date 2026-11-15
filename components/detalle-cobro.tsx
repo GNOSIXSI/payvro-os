@@ -95,7 +95,7 @@ function CopiaPagina({ publicId, urlPago }: { publicId: string; urlPago?: string
         <Button type="button" disabled className="min-h-11">
           Copiar link
         </Button>
-        <p className="text-sm text-muted">{DESTINO_SERVIDOR.aviso}</p>
+        <p className="text-sm text-muted">El link de pago aún no está disponible</p>
       </div>
     );
   }
