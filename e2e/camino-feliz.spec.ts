@@ -17,13 +17,15 @@ test("de /panel a Liberado contra el motor, en DEMO", async ({ page, context }) 
   await page.getByLabel("Monto").fill("450");
   await page.getByRole("button", { name: "Crear cobro" }).click();
   await expect(page).toHaveURL(/\/panel\/cobros\/cob_/, { timeout: 20_000 });
+  const publicId = publicIdDe(page.url());
+  const folio = (await page.getByText(/^#\d+$/).textContent())?.trim() ?? "";
   await expect(page.getByText("Esperando pago", { exact: true })).toBeVisible({ timeout: 20_000 });
   await expect(demo(page)).toBeVisible();
 
   await page.getByRole("button", { name: "Copiar link" }).click();
   await expect(page.getByRole("button", { name: "Copiado" })).toBeVisible();
   const enlace = await page.evaluate(() => navigator.clipboard.readText());
-  expect(enlace).toMatch(/\/pagar\/cob_[0-9A-HJKMNP-TV-Z]{26}$/);
+  expect(enlace).toBe(`http://127.0.0.1:3105/pagar/${publicId}`);
 
   const pagador = await context.newPage();
   const enviados: string[] = [];
@@ -45,10 +47,21 @@ test("de /panel a Liberado contra el motor, en DEMO", async ({ page, context }) 
   await expect(page.getByText("Pendiente", { exact: true })).toHaveCount(0);
 
   await page.goto("/panel");
-  const fila = page.getByRole("row", { name: /Pedido de prueba/ }).filter({ hasText: "Liberado" }).first();
-  await expect(fila).toBeVisible();
+  const fila = page.getByRole("row").filter({
+    has: page.locator(`a[href="/panel/cobros/${publicId}"]`),
+  });
+  await expect(fila).toContainText("Liberado");
+  await expect(fila.getByRole("link", { name: folio ?? "", exact: true })).toBeVisible();
   await expect(demo(page)).toBeVisible();
 });
+
+function publicIdDe(url: string): string {
+  const id = new URL(url).pathname.split("/").pop() ?? "";
+  if (!/^cob_[0-9A-HJKMNP-TV-Z]{26}$/.test(id)) {
+    throw new Error("el cobro creado no trae publicId");
+  }
+  return id;
+}
 
 function demo(page: Page) {
   return page.getByText("DEMO", { exact: true }).first();
