@@ -6,12 +6,6 @@ import { Component, useCallback, useEffect, useState, type ReactNode } from "rea
 import { api } from "@/convex/_generated/api";
 import { HAY_CONVEX } from "@/lib/hay-convex";
 
-const PERFIL_DEMO = {
-  nombre: "Dulces Ana — Ejemplo",
-  giro: "social",
-  colorMarca: "#076B76",
-} as const;
-
 const AVISO_AUSENTE = "El negocio todavía no está configurado.";
 
 export function AsegurarNegocio({ children }: { children: ReactNode }) {
@@ -64,10 +58,10 @@ function SondaNegocio({ onListo }: { onListo: () => void }) {
 }
 
 function PrepararDemo({ onListo }: { onListo: () => void }) {
-  const actualizar = useMutation(api.negocio.actualizarPerfil);
+  const preparar = useMutation(api.negocio.preparar);
   useEffect(() => {
     let vivo = true;
-    void actualizar(PERFIL_DEMO)
+    void preparar({})
       .then(() => {
         if (vivo) onListo();
       })
@@ -77,7 +71,7 @@ function PrepararDemo({ onListo }: { onListo: () => void }) {
     return () => {
       vivo = false;
     };
-  }, [actualizar, onListo]);
+  }, [preparar, onListo]);
   return <p className="px-6 py-12 text-ink">Preparando la cuenta de práctica…</p>;
 }
 

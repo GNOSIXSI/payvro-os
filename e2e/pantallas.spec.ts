@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { entrarAlPanel } from "./entrar-panel";
 
 const COBRO_ESPERA = "cob_00000000000000000000000000";
 const RUTAS = [
@@ -12,7 +13,7 @@ const RUTAS = [
 ] as const;
 
 test("/panel shows the three tiles and DEMO", async ({ page }) => {
-  await page.goto("/panel");
+  await entrarAlPanel(page);
 
   await expect(page.getByText("Cobrado hoy")).toBeVisible();
   await expect(page.getByText("Por liberar")).toBeVisible();
@@ -42,6 +43,7 @@ test("payer page does not mention CLABE, keys or api key", async ({ page }) => {
 });
 
 test("keyboard can create a cobro and the local payer link is available", async ({ page }) => {
+  await entrarAlPanel(page);
   await page.goto("/panel/nuevo");
   await page.getByLabel("Concepto").fill("Pedido de prueba");
   await page.getByLabel("Monto").fill("0.01");
@@ -59,7 +61,7 @@ test("panel and alta call the real cobro mutation", async ({ page }) => {
     socket.on("framereceived", (frame) => recibidos.push(textoDeFrame(frame.payload)));
   });
 
-  await page.goto("/panel");
+  await entrarAlPanel(page);
   await expect(page.getByText("Cobrado hoy")).toBeVisible();
   await expect.poll(() => enviados.join("\n")).toContain("cobros:listar");
   await expect.poll(() => enviados.join("\n")).toContain("cobros:resumenDelDia");
@@ -77,6 +79,7 @@ test("screens do not scroll horizontally at 375 and 1280", async ({ page }) => {
   const carpeta = path.join(process.cwd(), ".review", "os04-capturas");
   fs.mkdirSync(carpeta, { recursive: true });
 
+  await entrarAlPanel(page);
   for (const ancho of [375, 1280] as const) {
     await page.setViewportSize({ width: ancho, height: 900 });
     for (const ruta of RUTAS) {
