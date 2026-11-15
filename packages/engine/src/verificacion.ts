@@ -9,9 +9,9 @@ export interface Evidencia { link?: EvidenciaLink; transacciones: TransaccionPey
 export type MotivoRevision = "monto_distinto" | "destino_distinto" | "metodo_no_permitido" | "con_propina" | "duplicado" | "parcial";
 export type Veredicto = { resultado: "sin_pago" } | { resultado: "coincide"; transacciones: TransaccionPey[] } | { resultado: "revisar"; motivo: MotivoRevision; transacciones: TransaccionPey[] };
 export function evaluar(esperado: Esperado, evidencia: Evidencia): Veredicto {
-  if (evidencia.link?.status === "partial") return { resultado: "revisar", motivo: "parcial", transacciones: evidencia.transacciones };
   const payableType = esperado.tipo === "link" ? "PAYMENT_LINK" : "API_CODI_QR";
   const pagadas = evidencia.transacciones.filter((t) => t.status === "PAID" && t.currency === "MXN" && t.payableType === payableType && t.payableId === esperado.peyPayableId);
+  if (evidencia.link?.status === "partial") return { resultado: "revisar", motivo: "parcial", transacciones: pagadas };
   if (!pagadas.length) return { resultado: "sin_pago" };
   if (esperado.tipo === "link" && evidencia.link?.clientReferenceId !== esperado.intentoPublicId)
     return { resultado: "revisar", motivo: "destino_distinto", transacciones: pagadas };
