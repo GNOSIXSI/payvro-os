@@ -9,6 +9,7 @@ import { Monto } from "@/components/monto";
 import { QrCodi } from "@/components/qr-codi";
 import { Button } from "@/components/ui/button";
 import { api } from "@/convex/_generated/api";
+import { colorTextoMarca } from "@/lib/contraste";
 import { vistaPagadorPorEtiqueta, type VistaEstado } from "@/lib/estados";
 import { mensajeDeError } from "@/lib/mensaje-error";
 
@@ -25,6 +26,25 @@ export type CobroPublicoVista = {
 
 export function PagarVista({ cobro, publicId }: { cobro: CobroPublicoVista; publicId: string }) {
   const vista = vistaPagadorPorEtiqueta(cobro.estadoVisible);
+  return (
+    <div className="min-h-screen bg-paper">
+      <Encabezado cobro={cobro} />
+      <div aria-live="polite">
+        <CuerpoEstado cobro={cobro} publicId={publicId} vista={vista} />
+      </div>
+    </div>
+  );
+}
+
+function CuerpoEstado({
+  cobro,
+  publicId,
+  vista,
+}: {
+  cobro: CobroPublicoVista;
+  publicId: string;
+  vista: VistaEstado;
+}) {
   if (cobro.estadoVisible === "Pago verificado") {
     return <PagarVerificado cobro={cobro} />;
   }
@@ -34,7 +54,7 @@ export function PagarVista({ cobro, publicId }: { cobro: CobroPublicoVista; publ
   if (cobro.estadoVisible === "Esperando pago") {
     return <PagarEsperando cobro={cobro} publicId={publicId} vista={vista} />;
   }
-  return <PagarCerrado cobro={cobro} />;
+  return <PagarCerrado />;
 }
 
 export function PagarAusente() {
@@ -48,8 +68,11 @@ export function PagarAusente() {
 function Encabezado({ cobro }: { cobro: CobroPublicoVista }) {
   return (
     <header
-      className="flex items-center justify-between gap-3 px-6 py-4 text-white"
-      style={{ backgroundColor: cobro.negocio.colorMarca }}
+      className="flex items-center justify-between gap-3 px-6 py-4"
+      style={{
+        backgroundColor: cobro.negocio.colorMarca,
+        color: colorTextoMarca(cobro.negocio.colorMarca),
+      }}
     >
       <h1 className="font-display text-lg font-semibold">{cobro.negocio.nombre}</h1>
       {cobro.modo === "demo" ? <EtiquetaDemo /> : null}
@@ -59,40 +82,31 @@ function Encabezado({ cobro }: { cobro: CobroPublicoVista }) {
 
 function PagarVerificado({ cobro }: { cobro: CobroPublicoVista }) {
   return (
-    <div className="min-h-screen bg-paper">
-      <Encabezado cobro={cobro} />
-      <main className="mx-auto flex max-w-lg flex-col items-center gap-4 px-6 py-12 text-center">
-        <span aria-hidden="true" className="text-5xl text-petroleo">
-          ✓
-        </span>
-        <h2 className="font-display text-3xl font-semibold text-ink">Pago verificado</h2>
-        <p className="text-ink">{cobro.negocio.nombre} ya recibió tu pago.</p>
-      </main>
-    </div>
+    <main className="mx-auto flex max-w-lg flex-col items-center gap-4 px-6 py-12 text-center">
+      <span aria-hidden="true" className="text-5xl text-petroleo">
+        ✓
+      </span>
+      <h2 className="font-display text-3xl font-semibold text-ink">Pago verificado</h2>
+      <p className="text-ink">{cobro.negocio.nombre} ya recibió tu pago.</p>
+    </main>
   );
 }
 
 function PagarRevision({ cobro }: { cobro: CobroPublicoVista }) {
   return (
-    <div className="min-h-screen bg-paper">
-      <Encabezado cobro={cobro} />
-      <main className="mx-auto flex max-w-lg flex-col gap-4 px-6 py-12">
-        <p className="text-lg text-ink">
-          Estamos revisando tu pago. {cobro.negocio.nombre} te contactará.
-        </p>
-      </main>
-    </div>
+    <main className="mx-auto flex max-w-lg flex-col gap-4 px-6 py-12">
+      <p className="text-lg text-ink">
+        Estamos revisando tu pago. {cobro.negocio.nombre} te contactará.
+      </p>
+    </main>
   );
 }
 
-function PagarCerrado({ cobro }: { cobro: CobroPublicoVista }) {
+function PagarCerrado() {
   return (
-    <div className="min-h-screen bg-paper">
-      <Encabezado cobro={cobro} />
-      <main className="mx-auto flex max-w-lg flex-col gap-4 px-6 py-12">
-        <p className="text-lg text-ink">Este cobro ya no está disponible.</p>
-      </main>
-    </div>
+    <main className="mx-auto flex max-w-lg flex-col gap-4 px-6 py-12">
+      <p className="text-lg text-ink">Este cobro ya no está disponible.</p>
+    </main>
   );
 }
 
@@ -106,19 +120,14 @@ function PagarEsperando({
   vista: VistaEstado;
 }) {
   return (
-    <div className="min-h-screen bg-paper">
-      <Encabezado cobro={cobro} />
-      <main className="mx-auto flex max-w-lg flex-col gap-6 px-6 py-8">
-        <Monto centavos={cobro.montoCentavos} className="font-display text-5xl font-semibold" />
-        <p className="text-sm text-muted">#{cobro.folio}</p>
-        <p className="text-ink">{cobro.concepto}</p>
-        <div aria-live="polite">
-          <ChipEstado {...vista} />
-        </div>
-        <QrYLink cobro={cobro} />
-        {cobro.modo === "demo" ? <SimularPago publicId={publicId} /> : null}
-      </main>
-    </div>
+    <main className="mx-auto flex max-w-lg flex-col gap-6 px-6 py-8">
+      <Monto centavos={cobro.montoCentavos} className="font-display text-5xl font-semibold" />
+      <p className="text-sm text-muted">#{cobro.folio}</p>
+      <p className="text-ink">{cobro.concepto}</p>
+      <ChipEstado {...vista} />
+      <QrYLink cobro={cobro} />
+      {cobro.modo === "demo" ? <SimularPago publicId={publicId} /> : null}
+    </main>
   );
 }
 
