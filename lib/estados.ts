@@ -44,3 +44,23 @@ export function estadoParaDueno(estado: EstadoCobro): VistaEstado {
 export function estadoParaPagador(estado: EstadoCobro): VistaEstado {
   return PAGADOR[estado];
 }
+
+export function esEstadoCobro(valor: string): valor is EstadoCobro {
+  return (ESTADOS_COBRO as readonly string[]).includes(valor);
+}
+
+const INTENTOS_TERMINALES = new Set(["pagado", "fallido", "descartado", "incierto"]);
+
+export function intentoEsTerminal(estado: string): boolean {
+  return INTENTOS_TERMINALES.has(estado);
+}
+
+export function vistaPagadorPorEtiqueta(etiqueta: string): VistaEstado {
+  for (const estado of ESTADOS_COBRO) {
+    const vista = PAGADOR[estado];
+    if (vista.etiqueta === etiqueta) {
+      return vista;
+    }
+  }
+  return { etiqueta, chip: "neutral" };
+}
