@@ -1,21 +1,34 @@
 "use client";
 
 import { useQuery } from "convex/react";
-import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
-import { PanelLateral } from "@/components/panel-lateral";
+import { useRouter } from "next/navigation";
+import { useEffect, type ReactNode } from "react";
+import { decidirAlta, useFotoAlta } from "@/components/alta-local";
+import { ShellPanel } from "@/components/shell-panel";
 import { api } from "@/convex/_generated/api";
 import { HAY_CONVEX } from "@/lib/hay-convex";
 
 export default function PanelLayout({ children }: { children: ReactNode }) {
-  const ruta = usePathname() ?? "/panel";
+  const router = useRouter();
+  const foto = useFotoAlta();
   const negocio = useQuery(api.negocio.obtener, HAY_CONVEX ? {} : "skip");
+  const decision = decidirAlta({
+    hayConvex: HAY_CONVEX,
+    nombreRemoto: negocio?.nombre,
+    altaLocal: foto.alta,
+    nombreDemo: "",
+  });
   const modo = HAY_CONVEX ? negocio?.modo : undefined;
 
+  useEffect(() => {
+    if (foto.lista && decision.mostrarAsistente) {
+      router.replace("/bienvenida");
+    }
+  }, [foto.lista, decision.mostrarAsistente, router]);
+
   return (
-    <div className="min-h-screen bg-paper md:grid md:grid-cols-[15rem_minmax(0,1fr)]">
-      <PanelLateral modo={modo} ruta={ruta} />
-      <main className="min-w-0 px-4 py-6 md:px-8 md:py-8">{children}</main>
-    </div>
+    <ShellPanel modo={modo} nombre={decision.nombre}>
+      {children}
+    </ShellPanel>
   );
 }
