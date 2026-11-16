@@ -332,7 +332,7 @@ export const verificarIntento = internalAction({
               break;
             }
           }
-          if (!motivoCuenta && !destinoConfirmado && pruebaInconclusa) {
+          if (!destinoConfirmado && pruebaInconclusa) {
             await ctx.runMutation(internal.motor.verificar.registrarLectura, { intentoId: args.intentoId, exitosa: false });
             return { ok: false, resultado: "diferida" };
           }

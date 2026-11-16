@@ -87,6 +87,8 @@ describe("LIVE QR verification and heartbeat at the Convex caller boundary", () 
     { caso: "matching row and unrelated noise", items: [...cuentaFixture.items, transaccionWire(TX_ID)], resultado: "coincide", ok: true },
     { caso: "different amount", items: [transaccionWire(TX_ID, { amount: 150, amountBreakdown: { base: 150, tip: 0, fee: 0 } })], resultado: "monto_distinto", ok: true },
     { caso: "different datePaid only", items: [transaccionWire(TX_ID, { datePaid: 1794657601 })], resultado: "diferida", ok: false },
+    { caso: "unreadable id alongside matching row", items: [{ payableType: "UNRECOGNIZED" }, transaccionWire(TX_ID)], resultado: "diferida", ok: false },
+    { caso: "unreadable id alongside amount conflict", items: [{ payableType: "UNRECOGNIZED" }, transaccionWire(TX_ID, { amount: 150, amountBreakdown: { base: 150, tip: 0, fee: 0 } })], resultado: "diferida", ok: false },
   ])("classifies account evidence: $caso", async ({ items, resultado, ok }) => {
     const t = nuevoLiveHarness();
     const negocioId = await insertarNegocioLive(t);
