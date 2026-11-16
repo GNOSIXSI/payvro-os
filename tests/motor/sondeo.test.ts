@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "../../convex/_generated/api";
 import { insertarIntentoLive, insertarNegocioLive, nuevoLiveHarness, respuestaJson, transaccionWire, BANK_ID, QR_ID, TX_ID } from "./live-support";
 
+import cuentaFixture from "../pey/formas/transacciones-cuenta.json";
+
 const ID_TX_2 = "01CCCCCCCCCCCCCCCCCCCCCCCC";
 
 function setLiveEnvironment(): void {
@@ -76,6 +78,46 @@ describe("LIVE QR verification and heartbeat at the Convex caller boundary", () 
     expect(result.cobro).toMatchObject({ estado: "en_revision", motivoRevision: "destino_distinto" });
     expect(result.pagos).toHaveLength(1);
     expect(result.cobro?.estado).not.toBe("liberado");
+  });
+
+  it.each([
+    { caso: "unrelated dropped row", items: cuentaFixture.items, resultado: "destino_distinto", ok: true },
+    { caso: "relevant dropped row", items: [{ id: TX_ID, payableType: "UNRECOGNIZED" }], resultado: "diferida", ok: false },
+    { caso: "unreadable dropped id", items: [{ payableType: "UNRECOGNIZED" }], resultado: "diferida", ok: false },
+    { caso: "matching row and unrelated noise", items: [...cuentaFixture.items, transaccionWire(TX_ID)], resultado: "coincide", ok: true },
+    { caso: "different amount", items: [transaccionWire(TX_ID, { amount: 150, amountBreakdown: { base: 150, tip: 0, fee: 0 } })], resultado: "monto_distinto", ok: true },
+    { caso: "different datePaid only", items: [transaccionWire(TX_ID, { datePaid: 1794657601 })], resultado: "diferida", ok: false },
+  ])("classifies account evidence: $caso", async ({ items, resultado, ok }) => {
+    const t = nuevoLiveHarness();
+    const negocioId = await insertarNegocioLive(t);
+    const { intentoId, cobroId } = await insertarIntentoLive(t, negocioId);
+    const fetcher = fixtureFetch((url) => {
+      if (url.pathname === `/transaction/codi/qr/${QR_ID}`) return respuestaJson(200, { items: [{ id: TX_ID }], nextToken: null });
+      if (url.pathname === `/transaction/${TX_ID}`) return respuestaJson(200, transaccionWire(TX_ID));
+      if (url.pathname === `/transaction/bank-account/${BANK_ID}`) return respuestaJson(200, { items, nextToken: null });
+      throw new Error("unexpected fake pey request");
+    });
+    await expect(t.action(internal.motor.verificar.verificarIntento, { intentoId, origen: "sondeo" }))
+      .resolves.toEqual({ ok, resultado });
+    const result = await t.run(async (ctx) => ({
+      cobro: await ctx.db.get(cobroId), pagos: await ctx.db.query("pagos").collect(),
+      bitacora: await ctx.db.query("bitacora").collect(),
+    }));
+    expect(fetcher.mock.calls.map(([input]) => new URL(String(input)).pathname)).toEqual([
+      `/transaction/codi/qr/${QR_ID}`, `/transaction/${TX_ID}`, `/transaction/bank-account/${BANK_ID}`,
+    ]);
+    expect(result.pagos).toHaveLength(ok ? 1 : 0);
+    if (resultado === "coincide") {
+      expect(result.cobro?.estado).toBe("liberado");
+      expect(result.bitacora.filter((row) => row.tipo === "cobro.liberado")).toHaveLength(1);
+      await expect(t.action(internal.motor.verificar.verificarIntento, { intentoId, origen: "sondeo" }))
+        .resolves.toEqual({ ok: true, resultado: "repetido" });
+    } else {
+      expect(result.cobro?.liberadoEn).toBeUndefined();
+      expect(result.cobro?.estado).toBe(ok ? "en_revision" : "esperando_pago");
+      expect(result.cobro?.motivoRevision).toBe(ok ? resultado : undefined);
+      if (ok) expect(result.pagos[0].resultado).toBe(resultado);
+    }
   });
 
   it("defers a paid detail while the account list still shows that id as pending, then releases once", async () => {
