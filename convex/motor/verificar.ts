@@ -38,16 +38,15 @@ const SONDEO_LEASE_MS = 60_000;
 const BARRIDO_INTERVALO_MS = 45_000;
 const BARRIDO_DESCARTADO_MS = 60_000;
 
+function mismoMonto(a: TransaccionPey, b: TransaccionPey): boolean {
+  return a.amount === b.amount && a.amountBreakdown.base === b.amountBreakdown.base &&
+    a.amountBreakdown.tip === b.amountBreakdown.tip && a.amountBreakdown.fee === b.amountBreakdown.fee;
+}
+
 function mismaTransaccion(a: TransaccionPey, b: TransaccionPey): boolean {
   return a.transactionId === b.transactionId && a.status === "PAID" && b.status === "PAID" &&
     a.payableType === b.payableType && a.payableId === b.payableId && a.currency === b.currency &&
-    a.paymentMethod === b.paymentMethod && a.amount === b.amount &&
-    a.amountBreakdown.base === b.amountBreakdown.base && a.amountBreakdown.tip === b.amountBreakdown.tip &&
-    a.amountBreakdown.fee === b.amountBreakdown.fee && a.datePaid === b.datePaid;
-}
-
-function idVistoSinConfirmar(objetivo: TransaccionPey, fila: TransaccionPey): boolean {
-  return fila.transactionId === objetivo.transactionId && fila.status !== "PAID";
+    a.paymentMethod === b.paymentMethod && mismoMonto(a, b) && a.datePaid === b.datePaid;
 }
 
 async function leaseSondeoDisponible(ctx: ActionCtx, intentoId: Id<"intentos">, leaseId?: string): Promise<boolean> {
@@ -117,6 +116,7 @@ export const aplicarEvidencia = internalMutation({
   args: {
     intentoId: v.id("intentos"), evidencia: v.object({
       transacciones: v.array(txValidator), link: v.optional(linkValidator), destinoConfirmado: v.optional(v.boolean()),
+      motivoCuenta: v.optional(v.literal("monto_distinto")),
     }), origen: origenValidator,
   },
   returns: v.object({ ok: v.boolean(), resultado: v.string() }),
@@ -129,12 +129,15 @@ export const aplicarEvidencia = internalMutation({
     }
     if (!intento.peyPayableId) return { ok: true, resultado: "sin_pago" };
     const evidencia = args.evidencia as Evidencia;
-    const veredicto = evaluar({
+    const evaluado = evaluar({
       tipo: intento.tipo, peyPayableId: intento.peyPayableId, intentoPublicId: intento.publicId,
       montoCentavos: intento.montoCentavos, destino: intento.destino,
     }, evidencia);
-    if (veredicto.resultado === "sin_pago") return { ok: true, resultado: "sin_pago" };
-    const pagadas = veredicto.transacciones;
+    if (evaluado.resultado === "sin_pago") return { ok: true, resultado: "sin_pago" };
+    const veredicto = args.evidencia.motivoCuenta
+      ? { resultado: "revisar" as const, motivo: args.evidencia.motivoCuenta, transacciones: evaluado.transacciones }
+      : evaluado;
+    const pagadas = [...new Map(veredicto.transacciones.map((tx) => [tx.transactionId, tx])).values()];
     const nuevas: TransaccionPey[] = [];
     for (const transaccion of pagadas) {
       const reclamo = await ctx.db.query("pagos").withIndex("by_peyTransactionId", (q) => q.eq("peyTransactionId", transaccion.transactionId)).unique();
@@ -188,14 +191,15 @@ export const aplicarEvidencia = internalMutation({
       }
       return { ok: true, resultado: "duplicado" };
     }
-    if (cobro.estado === "en_revision" && veredicto.resultado === "revisar") {
+    if (cobro.estado === "en_revision") {
       for (const pagoId of pagosInsertados) {
         await registrar(ctx, {
-          negocioId: negocio._id, modo: negocio.modo, tipo: "pago.no_coincide", cobroId: cobro._id,
-          intentoId: intento._id, pagoId, actor: { tipo: "pey" }, detalle: { motivo: veredicto.motivo }, en: ahora,
+          negocioId: negocio._id, modo: negocio.modo, tipo: veredicto.resultado === "revisar" ? "pago.no_coincide" : "pago.verificado", cobroId: cobro._id,
+          intentoId: intento._id, pagoId, actor: { tipo: "pey" },
+          detalle: veredicto.resultado === "revisar" ? { motivo: veredicto.motivo } : {}, en: ahora,
         });
       }
-      return { ok: true, resultado: veredicto.motivo };
+      return { ok: true, resultado: veredicto.resultado === "revisar" ? veredicto.motivo : "en_revision" };
     }
     if (tardio) {
       const nuevoEstado = transicionarCobro(cobro.estado, "pago_tardio");
@@ -297,6 +301,7 @@ export const verificarIntento = internalAction({
       }
 
       let destinoConfirmado = false;
+      let motivoCuenta: "monto_distinto" | undefined;
       if (datos.tipo === "qr" && datos.destino === "bank_account_id") {
         const relevantes = transacciones.filter((tx) => tx.status === "PAID" && tx.currency === "MXN" && tx.payableType === "API_CODI_QR" && tx.payableId === datos.peyPayableId);
         if (relevantes.length > 0) {
@@ -307,13 +312,16 @@ export const verificarIntento = internalAction({
           for (let paginaNumero = 0; paginaNumero < MAX_PAGINAS_CUENTA; paginaNumero += 1) {
             if (!(await leaseSondeoDisponible(ctx, args.intentoId, args.leaseId))) return { ok: false, resultado: "sondeo_deteniendo" };
             const pagina = await puerto.listarTransaccionesCuenta(token);
-            if (pagina.descartadas > 0) pruebaInconclusa = true;
+            if (pagina.idsDescartadas.some((id) => id === null || relevantes.some((tx) => tx.transactionId === id))) pruebaInconclusa = true;
             for (const row of pagina.transactions) {
               const objetivo = relevantes.find((tx) => tx.transactionId === row.transactionId);
               if (objetivo && mismaTransaccion(objetivo, row)) encontrados.add(row.transactionId);
-              else if (objetivo && idVistoSinConfirmar(objetivo, row)) pruebaInconclusa = true;
+              else if (objetivo) {
+                if (row.status === "PAID" && !mismoMonto(objetivo, row)) motivoCuenta = "monto_distinto";
+                else pruebaInconclusa = true;
+              }
             }
-            if (relevantes.every((tx) => encontrados.has(tx.transactionId))) {
+            if (!motivoCuenta && !pruebaInconclusa && relevantes.every((tx) => encontrados.has(tx.transactionId))) {
               listaCompleta = true;
               destinoConfirmado = true;
               break;
@@ -324,7 +332,7 @@ export const verificarIntento = internalAction({
               break;
             }
           }
-          if (!destinoConfirmado && pruebaInconclusa) {
+          if (!motivoCuenta && !destinoConfirmado && pruebaInconclusa) {
             await ctx.runMutation(internal.motor.verificar.registrarLectura, { intentoId: args.intentoId, exitosa: false });
             return { ok: false, resultado: "diferida" };
           }
@@ -334,10 +342,11 @@ export const verificarIntento = internalAction({
           }
         }
       }
-      const evidencia: Evidencia = {
+      const evidencia = {
         transacciones,
         ...(link ? { link } : {}),
         ...(datos.tipo === "qr" ? { destinoConfirmado } : {}),
+        ...(motivoCuenta ? { motivoCuenta } : {}),
       };
       const resultado = await ctx.runMutation(internal.motor.verificar.aplicarEvidencia, { intentoId: args.intentoId, evidencia, origen: args.origen });
       await ctx.runMutation(internal.motor.verificar.registrarLectura, { intentoId: args.intentoId, exitosa: true });

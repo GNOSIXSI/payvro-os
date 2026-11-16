@@ -39,6 +39,8 @@ export interface PaginaTransacciones {
   nextToken: string | null;
   /** Rows skipped because the payable shape was not recognized. Zero means every row was readable. */
   descartadas: number;
+  /** Readable ids of skipped rows; null means the id could not be safely read. */
+  idsDescartadas: (string | null)[];
 }
 
 export interface TransaccionPeyWire {
