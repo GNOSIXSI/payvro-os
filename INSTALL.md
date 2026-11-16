@@ -160,7 +160,8 @@ If the account is `PENDING` or `PROCESSING`: it is not ready (pey says up to 5 b
 Confirm with the owner before creating the project.
 
 1. Import the repository into Vercel (or `npx vercel link`).
-2. In the Vercel project → Settings → Environment Variables, the **owner** adds: `CONVEX_DEPLOY_KEY` (from the Convex dashboard → Settings → Deploy keys → production), `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`.
+2. In the Vercel project → Settings → Environment Variables, the **owner** adds `CONVEX_DEPLOY_KEY` (from the Convex dashboard → Settings → Deploy keys → production). For LIVE, also `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY`; a DEMO site runs without them.
+   Before the first deploy, set `CLERK_JWT_ISSUER_DOMAIN` on the Convex **production** deployment, even for DEMO: the push validates `convex/auth.config.ts` and fails if the variable is missing. Use the Clerk Frontend API URL; it is not a secret. Without Clerk, a non-secret placeholder such as `https://issuer.ejemplo.invalid` works, as `e2e/servidor.sh` does.
 3. Build command: `npx convex deploy --cmd 'npm run build'`. This deploys the Convex functions and injects `NEXT_PUBLIC_CONVEX_URL` into the build.
 4. After the first deploy, set the public origin on the Convex production deployment (no trailing slash):
    ```bash
