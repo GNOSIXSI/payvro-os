@@ -127,6 +127,26 @@ export const registrarLectura = internalMutation({
   },
 });
 
+export const registrarDatoIlegible = internalMutation({
+  args: { intentoId: v.id("intentos") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const intento = await ctx.db.get(args.intentoId);
+    const cobro = intento ? await ctx.db.get(intento.cobroId) : null;
+    const negocio = intento ? await ctx.db.get(intento.negocioId) : null;
+    if (!intento || !cobro || !negocio || intento.negocioId !== cobro.negocioId || cobro.negocioId !== negocio._id || intento.modo !== cobro.modo || cobro.modo !== negocio.modo) {
+      throw new ConvexError({ codigo: "NO_ENCONTRADO", mensaje: "No se encontró el intento." });
+    }
+    const ultima = await ctx.db.query("bitacora").withIndex("by_cobro_seq", (q) => q.eq("cobroId", cobro._id)).order("desc").first();
+    if (ultima?.tipo === "pey.dato_ilegible") return null;
+    await registrar(ctx, {
+      negocioId: negocio._id, modo: negocio.modo, tipo: "pey.dato_ilegible", cobroId: cobro._id,
+      intentoId: intento._id, actor: { tipo: "pey" }, detalle: {},
+    });
+    return null;
+  },
+});
+
 export const aplicarEvidencia = internalMutation({
   args: {
     intentoId: v.id("intentos"), evidencia: v.object({
@@ -325,6 +345,7 @@ export const verificarIntento = internalAction({
           let token: string | undefined;
           let listaCompleta = false;
           let pruebaInconclusa = false;
+          let datoIlegible = false;
           for (let paginaNumero = 0; paginaNumero < MAX_PAGINAS_CUENTA; paginaNumero += 1) {
             if (!(await leaseSondeoDisponible(ctx, args.intentoId, args.leaseId))) return { ok: false, resultado: "sondeo_deteniendo" };
             const pagina = await puerto.listarTransaccionesCuenta(token);
@@ -334,7 +355,10 @@ export const verificarIntento = internalAction({
               const montoCompatible = dato?.baseCentavos == null || dato.baseCentavos === datos.montoCentavos;
               const fechaCompatible = dato?.pagadoEn == null || (dato.pagadoEn >= datos.creadoEn && dato.pagadoEn <= datos.expiraEn);
               return montoCompatible && fechaCompatible;
-            })) pruebaInconclusa = true;
+            })) {
+              pruebaInconclusa = true;
+              datoIlegible = true;
+            }
             for (const row of pagina.transactions) {
               const objetivo = relevantes.find((tx) => tx.transactionId === row.transactionId);
               if (objetivo && mismaTransaccion(objetivo, row)) encontrados.add(row.transactionId);
@@ -355,6 +379,7 @@ export const verificarIntento = internalAction({
             }
           }
           if (!destinoConfirmado && pruebaInconclusa) {
+            if (datoIlegible) await ctx.runMutation(internal.motor.verificar.registrarDatoIlegible, { intentoId: args.intentoId });
             await ctx.runMutation(internal.motor.verificar.registrarLectura, { intentoId: args.intentoId, exitosa: false });
             return { ok: false, resultado: "diferida" };
           }

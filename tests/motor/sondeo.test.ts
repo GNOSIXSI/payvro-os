@@ -3,6 +3,7 @@ import { api, internal } from "../../convex/_generated/api";
 import { insertarIntentoLive, insertarNegocioLive, nuevoLiveHarness, respuestaJson, transaccionWire, BANK_ID, QR_ID, TX_ID } from "./live-support";
 
 import cuentaFixture from "../pey/formas/transacciones-cuenta.json";
+import { registrar } from "../../convex/motor/bitacora";
 
 const ID_TX_2 = "01CCCCCCCCCCCCCCCCCCCCCCCC";
 
@@ -191,7 +192,8 @@ describe("LIVE QR verification and heartbeat at the Convex caller boundary", () 
   ])("classifies account evidence: $caso", async ({ items, resultado, ok }) => {
     const t = nuevoLiveHarness();
     const negocioId = await insertarNegocioLive(t);
-    const { intentoId, cobroId } = await insertarIntentoLive(t, negocioId);
+    const { intentoId, cobroId, cobroPublicId } = await insertarIntentoLive(t, negocioId);
+    const before = await t.run(async (ctx) => ({ cobro: await ctx.db.get(cobroId), negocio: await ctx.db.get(negocioId) }));
     const fetcher = fixtureFetch((url) => {
       if (url.pathname === `/transaction/codi/qr/${QR_ID}`) return respuestaJson(200, { items: [{ id: TX_ID }], nextToken: null });
       if (url.pathname === `/transaction/${TX_ID}`) return respuestaJson(200, transaccionWire(TX_ID));
@@ -208,6 +210,41 @@ describe("LIVE QR verification and heartbeat at the Convex caller boundary", () 
       `/transaction/codi/qr/${QR_ID}`, `/transaction/${TX_ID}`, `/transaction/bank-account/${BANK_ID}`,
     ]);
     expect(result.pagos).toHaveLength(ok ? 1 : 0);
+    const ilegible = resultado === "diferida" && items.some((row) => row.payableType === "UNRECOGNIZED" || !("id" in row) || row.id === "unreadable");
+    const eventosIlegibles = result.bitacora.filter((row) => row.tipo === "pey.dato_ilegible");
+    expect.soft(eventosIlegibles).toHaveLength(ilegible ? 1 : 0);
+    if (ilegible) {
+      expect.soft(eventosIlegibles[0]).toMatchObject({ cobroId, intentoId, actor: { tipo: "pey" }, detalle: {}, en: expect.any(Number) });
+      expect(result.cobro).toEqual(before.cobro);
+      expect((await t.run((ctx) => ctx.db.get(negocioId)))?.enRevisionCount).toBe(before.negocio?.enRevisionCount);
+      await expect(t.action(internal.motor.verificar.verificarIntento, { intentoId, origen: "barrido" }))
+        .resolves.toEqual({ ok: false, resultado: "diferida" });
+      expect.soft(await t.run((ctx) => ctx.db.query("bitacora").withIndex("by_cobro_seq", (q) => q.eq("cobroId", cobroId)).collect())).toHaveLength(1);
+      const owner = t.withIdentity({ email: "owner@example.invalid", emailVerified: true });
+      const page = await owner.query(api.panel.bitacora, { cobroPublicId, paginationOpts: { cursor: null, numItems: 20 } });
+      expect.soft(page.page).toMatchObject([{ tipo: "pey.dato_ilegible", detalle: {}, en: eventosIlegibles[0]?.en }]);
+      expect.soft(page.page[0]?.detalle).toEqual({});
+      // OS resolves one business per deployment, not a business from an identity argument.
+      const otroId = await insertarNegocioLive(t);
+      await t.run(async (ctx) => ctx.db.patch(negocioId, { modo: "demo" }));
+      vi.stubEnv("PAYVRO_OWNER_EMAILS", "other-owner@example.invalid");
+      const otro = t.withIdentity({ email: "other-owner@example.invalid", emailVerified: true });
+      expect((await otro.query(api.panel.bitacora, { cobroPublicId, paginationOpts: { cursor: null, numItems: 20 } })).page).toEqual([]);
+      expect((await otro.query(api.panel.bitacora, { paginationOpts: { cursor: null, numItems: 20 } })).page).toEqual([]);
+      await t.run(async (ctx) => { await ctx.db.delete(otroId); await ctx.db.patch(negocioId, { modo: "live" }); });
+      vi.stubEnv("PAYVRO_OWNER_EMAILS", "owner@example.invalid");
+      await t.run((ctx) => registrar(ctx, { negocioId, modo: "live", tipo: "evento.recibido", cobroId, intentoId, actor: { tipo: "sistema" }, detalle: { origen: "simulador" } }));
+      await t.action(internal.motor.verificar.verificarIntento, { intentoId, origen: "sondeo" });
+      const after = await t.run((ctx) => ctx.db.query("bitacora").withIndex("by_cobro_seq", (q) => q.eq("cobroId", cobroId)).collect());
+      expect(after.map((row) => row.tipo)).toEqual(["pey.dato_ilegible", "evento.recibido", "pey.dato_ilegible"]);
+      const unchanged = await t.run(async (ctx) => ({
+        cobro: await ctx.db.get(cobroId), negocio: await ctx.db.get(negocioId),
+        pagos: await ctx.db.query("pagos").withIndex("by_cobro", (q) => q.eq("cobroId", cobroId)).collect(),
+      }));
+      expect(unchanged.cobro).toEqual(before.cobro);
+      expect(unchanged.pagos).toEqual([]);
+      expect(unchanged.negocio?.enRevisionCount).toBe(before.negocio?.enRevisionCount);
+    }
     if (resultado === "coincide") {
       expect(result.cobro?.estado).toBe("liberado");
       expect(result.bitacora.filter((row) => row.tipo === "cobro.liberado")).toHaveLength(1);
@@ -382,6 +419,7 @@ describe("LIVE QR verification and heartbeat at the Convex caller boundary", () 
     intento = await t.run((ctx) => ctx.db.get(intentoId));
     expect(fetcher).toHaveBeenCalledTimes(2);
     expect(intento?.sondeoBackoffMs).toBe(4_000);
+    expect(await t.run((ctx) => ctx.db.query("bitacora").collect())).toEqual([]);
   });
 
   it("does not restart a chain after the fifteen-minute lifetime cap", async () => {
