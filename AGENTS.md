@@ -11,7 +11,7 @@ Locked (ADR-0001). Do not add a database, a queue, a service, a state library, a
 
 ## 2. Commands
 
-WP-OS-01 creates these scripts. From then on they are the only way to check work.
+These scripts exist in `package.json`. They are the only way to check work.
 
 | Command | Does |
 |---|---|
@@ -24,7 +24,8 @@ WP-OS-01 creates these scripts. From then on they are the only way to check work
 | `npm run build` | `next build`. |
 | `npm run secrets` | gitleaks over the working tree and the branch history. |
 | `npm run gate` | All of the above, in that order, stopping at the first failure. |
-| `npm run doctor` | Checks the environment and prints names of missing variables, never values (WP-OS-05). |
+| `npm run doctor` | Checks the environment and prints names of missing variables, never values. |
+| `npm run smoke:demo` | Against the configured dev deployment in DEMO: creates a cobro, simulates the payment, waits for `liberado`. Refuses to run in LIVE. Not part of `gate`. |
 
 ## 3. Gates
 
@@ -89,7 +90,7 @@ Process
 | `convex/motor/**`, `convex/schema.ts` | astra | read-only |
 | `convex/http.ts`, `convex/crons.ts` | astra | read-only |
 | `convex/cobros.ts`, `panel.ts`, `publico.ts`, `demo.ts`, `negocio.ts`, `puertos.ts` | astra (implementation); sol created the stubs | signatures change only with an `ARCHITECTURE.md` §8 change in the same PR |
-| `app/**`, `components/**`, `lib/**`, `e2e/**` | cursor-grok today; sol afterwards | astra: no |
+| `app/**`, `components/**`, `lib/**`, `e2e/**` | sol (screens were built by cursor-grok) | astra: no |
 | `scripts/**`, `.github/**`, root config files | sol | ask in the PR |
 | `INSTALL.md`, `README.md`, `llms.txt` | sol | |
 | `CONTEXT.md`, `ARCHITECTURE.md`, `SECURITY.md`, `PLAN.md`, `docs/adr/**` | orchestrator | builders propose changes in the PR body |
@@ -105,7 +106,7 @@ Two work packages running at once never share a writable path. If yours would, s
 |---|---|---|
 | `astra` (GPT-6 Astra) | Engine, state machine, pey client, verification, sweep, webhook | `opus` + `gemini` |
 | `sol` (GPT 6.1 Sol) | Skeleton, gates, install flow, deploy, later UI and templates | `sonnet` + `gemini` |
-| `cursor-grok` (Grok 4.6) | Screens (last budget day: 2026-11-14) | `sonnet` + `gemini` |
+| `cursor-grok` (Grok 4.6) | Screens (its budget ended 2026-11-14) | `sonnet` + `gemini` |
 
 The reviewer is never the builder's vendor. Give the reviewer the repo, not only the diff. Verify a reviewer's finding before repeating it.
 
@@ -116,3 +117,29 @@ The reviewer is never the builder's vendor. Give the reviewer the repo, not only
 3. PR body: what and why, how to test, evidence for §3, risks, anything you could not do. Say plainly if a step was skipped or a test fails.
 4. Shared Convex dev deployments: the last `convex dev` wins. Each worktree uses its own dev deployment; never point two branches at one.
 5. When the WP teaches something about pey (a real response shape, a limit, an error), add it to `CONTEXT.md` §6 with its tag in the same PR.
+
+## 9. Repository hygiene
+
+- Only `main` and the branches of work in progress exist. Do not leave stale branches.
+- One branch per work package, one meaningful PR per work package.
+- No PR for a near one-line change: fold it into the next real PR.
+- Delete the branch after its PR is merged (local and remote).
+- Merge only with the founder's `VISTO-BUENO <sha>` on the PR, as in §3.6.
+
+## 10. Where things are
+
+| Path | What |
+|---|---|
+| `README.md` | Public overview in Spanish: what it is, the DEMO, repo map. |
+| `INSTALL.md` | Install flow for the agent of a business owner. |
+| `CONTEXT.md`, `ARCHITECTURE.md`, `SECURITY.md`, `PLAN.md` | Words and invariants; the spec; threat model; milestones and order. |
+| `app/`, `components/`, `lib/` | Next.js screens, UI components, UI helpers. |
+| `convex/` | Backend. `motor/` is the verification engine; `diagnostico.ts` serves `doctor`. |
+| `packages/engine/` | Shared engine: money, states, pey client. |
+| `tests/`, `e2e/` | Vitest and convex-test; Playwright in DEMO. |
+| `scripts/` | `gate.sh`, `doctor.mjs`, `smoke-demo.mjs`. |
+| `docs/adr/` | Locked decisions. |
+| `docs/wp/` | One file per work package. |
+| `docs/bitacora/` | Public build diary (Spanish). |
+| `docs/decisiones/`, `docs/design/` | Founders' decisions; UX reference prototype. |
+| `public/brand/` | Brand SVGs, never edited. |

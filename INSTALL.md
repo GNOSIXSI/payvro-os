@@ -160,14 +160,15 @@ If the account is `PENDING` or `PROCESSING`: it is not ready (pey says up to 5 b
 Confirm with the owner before creating the project.
 
 1. Import the repository into Vercel (or `npx vercel link`).
-2. In the Vercel project → Settings → Environment Variables, the **owner** adds: `CONVEX_DEPLOY_KEY` (from the Convex dashboard → Settings → Deploy keys → production), `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`.
+2. In the Vercel project → Settings → Environment Variables, the **owner** adds `CONVEX_DEPLOY_KEY` (from the Convex dashboard → Settings → Deploy keys → production). For LIVE, also `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY`; a DEMO site runs without them.
+   Before the first deploy, set `CLERK_JWT_ISSUER_DOMAIN` on the Convex **production** deployment, even for DEMO: the push validates `convex/auth.config.ts` and fails if the variable is missing. Use the Clerk Frontend API URL; it is not a secret. Without Clerk, a non-secret placeholder such as `https://issuer.ejemplo.invalid` works, as `e2e/servidor.sh` does.
 3. Build command: `npx convex deploy --cmd 'npm run build'`. This deploys the Convex functions and injects `NEXT_PUBLIC_CONVEX_URL` into the build.
 4. After the first deploy, set the public origin on the Convex production deployment (no trailing slash):
    ```bash
    npx convex env set --prod PAYVRO_PUBLIC_URL "https://<the-vercel-domain>"
    ```
-5. In Clerk, add the Vercel domain to the allowed origins.
-6. Open the site. Sign in with an email from the owner list. You must see the panel **without** the DEMO tag. Sign in with any other account: you must be refused.
+5. **DEMO check (no Clerk):** open the site. You must see the panel **with** the DEMO tag, and no real charge can be created. Stop here if the owner is not going LIVE yet.
+6. **LIVE only** (Clerk keys set in step 2): in Clerk, add the Vercel domain to the allowed origins. Open the site and sign in with an email from the owner list. You must see the panel **without** the DEMO tag. Sign in with any other account: you must be refused.
 
 Merging is not deploying: open the deployed URL and check it yourself.
 

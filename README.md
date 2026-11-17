@@ -17,17 +17,21 @@ PAYVRO hace esto: creas un cobro, tu cliente paga con CoDi desde la app de su ba
 
 PAYVRO OS es código disponible (fair-code): una instalación para un negocio, con tus propias cuentas y tu propia llave de pey. La instala tu agente de código, también en tu computadora.
 
-> **Estado:** en construcción, en público, durante el Hackatón México (14-nov a 12-dic de 2026). Lo que ya funciona y lo que falta está en [`PLAN.md`](PLAN.md). El diario de construcción está en [`docs/bitacora/`](docs/bitacora/).
+> **Estado:** en construcción, en público, durante el Hackatón México (14-nov a 12-dic de 2026).
+> - **Hito 1, listo para DEMO (parcial, 15-nov):** pantallas, motor en modo DEMO con verificación y una sola liberación por cobro, conexión LIVE por QR CoDi verificada con una lectura a pey, y el camino feliz probado de punta a punta en DEMO. Falta para cerrarlo: un cobro real de $0.01 verificado y liberado.
+> - **Sigue:** endurecer el motor de verificación y después LIVE: Clerk, llaves de pey y un cobro real de $0.01. Aún no hay un cobro LIVE hecho.
+> - El orden y los paquetes de trabajo están en [`PLAN.md`](PLAN.md). El diario de construcción está en [`docs/bitacora/`](docs/bitacora/).
 
 ## Pruébalo en un minuto (modo DEMO)
 
 El modo DEMO no usa llaves ni dinero real: un simulador hace el papel de pey.
 
-1. Abre la demo en vivo: _el enlace se publica aquí al cierre del hito 1 (domingo 15-nov)._
-2. En el panel, toca **Nuevo cobro**. Escribe un concepto y un monto.
-3. Abre la página del cobro: muestra el QR CoDi para pagar con la app del banco.
-4. Toca **Simular pago**.
-5. La página cambia a **Pago verificado** y en el panel el pedido aparece como **Liberado**.
+1. Abre la demo en vivo: [payvro-os.vercel.app](https://payvro-os.vercel.app)
+2. Toca **Ir al panel**. La primera vez te pide el nombre de tu negocio en tres pasos; no hace falta crear cuenta.
+3. Toca **Nuevo cobro**, escribe un concepto y un monto, y copia el link del cobro.
+4. Abre ese link: es la página que vería tu cliente, con el QR CoDi (en DEMO es un QR de práctica).
+5. Toca **Simular pago**.
+6. La página cambia a **Pago verificado** y en el panel el pedido aparece como **Liberado**.
 
 Para correr la DEMO en tu computadora:
 
@@ -37,6 +41,13 @@ cd payvro-os
 npm ci
 npx convex dev --once
 npm run dev
+```
+
+Para comprobar que quedó bien, con la DEMO configurada:
+
+```bash
+npm run doctor       # revisa el entorno; imprime nombres de variables, nunca valores
+npm run smoke:demo   # crea un cobro, simula el pago y espera «Liberado»
 ```
 
 ## Instálalo para tu negocio
@@ -67,6 +78,24 @@ La verdad del pago es siempre una consulta autenticada a pey. El aviso que manda
 La primera plantilla es **Pedido que se libera**, pensada para quien vende por WhatsApp o Instagram. Siguen anticipo de cita, cotización que arranca y mostrador.
 
 Hecho con Next.js, Clerk, Convex y la API de pey. El detalle está en [`ARCHITECTURE.md`](ARCHITECTURE.md) y las razones de cada decisión en [`docs/adr/`](docs/adr/).
+
+## Estructura del repo
+
+| Carpeta | Qué hay |
+|---|---|
+| `app/` | Páginas de Next.js: el panel del dueño y la página de pago `/pagar`. |
+| `components/` | Componentes de las pantallas (tabla de cobros, QR CoDi, línea de tiempo). |
+| `lib/` | Utilidades de la interfaz: formato, estados, modo DEMO/LIVE. |
+| `convex/` | Backend: datos, cobros, motor de verificación y tareas periódicas. |
+| `packages/engine/` | El motor compartido: dinero, estados y cliente de pey. |
+| `tests/` y `e2e/` | Pruebas unitarias (Vitest) y de punta a punta (Playwright). |
+| `scripts/` | `gate.sh`, `doctor.mjs` y `smoke-demo.mjs`. |
+| `public/brand/` | Logos de PAYVRO. No se modifican. |
+| `docs/` | `adr/` (decisiones), `wp/` (paquetes de trabajo), `bitacora/` (diario), `decisiones/` y `design/` (referencia de pantallas). |
+
+## Cómo se construye
+
+Cada paquete de trabajo vive en [`docs/wp/`](docs/wp/) y se entrega en una rama y un PR propios. Los agentes de código trabajan con las reglas de [`AGENTS.md`](AGENTS.md): una compuerta (`npm run gate`) que debe pasar, una prueba que se vio fallar primero y una revisión de otro proveedor. Nada se mezcla a `main` sin el visto bueno del fundador. Qué se decidió y qué falló, día por día, está en [`docs/bitacora/`](docs/bitacora/).
 
 ## Para agentes y para quien quiera contribuir
 
