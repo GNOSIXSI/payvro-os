@@ -18,7 +18,7 @@ PAYVRO hace esto: creas un cobro, tu cliente paga con CoDi desde la app de su ba
 PAYVRO OS es código disponible (fair-code): una instalación para un negocio, con tus propias cuentas y tu propia llave de pey. La instala tu agente de código, también en tu computadora.
 
 > **Estado:** en construcción, en público, durante el Hackatón México (14-nov a 12-dic de 2026).
-> - **Hito 1 listo (15-nov):** pantallas, motor en modo DEMO con verificación y una sola liberación por cobro, conexión LIVE por QR CoDi verificada con una lectura a pey, y el camino feliz probado de punta a punta en DEMO.
+> - **Hito 1, listo para DEMO (parcial, 15-nov):** pantallas, motor en modo DEMO con verificación y una sola liberación por cobro, conexión LIVE por QR CoDi verificada con una lectura a pey, y el camino feliz probado de punta a punta en DEMO. Falta para cerrarlo: un cobro real de $0.01 verificado y liberado.
 > - **Sigue:** endurecer el motor de verificación y después LIVE: Clerk, llaves de pey y un cobro real de $0.01. Aún no hay un cobro LIVE hecho.
 > - El orden y los paquetes de trabajo están en [`PLAN.md`](PLAN.md). El diario de construcción está en [`docs/bitacora/`](docs/bitacora/).
 
