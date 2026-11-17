@@ -43,6 +43,21 @@ function mismoMonto(a: TransaccionPey, b: TransaccionPey): boolean {
     a.amountBreakdown.tip === b.amountBreakdown.tip && a.amountBreakdown.fee === b.amountBreakdown.fee;
 }
 
+function evidenciaSinRepeticiones(evidencia: Evidencia): Evidencia {
+  const vistas = new Set<string>();
+  const transacciones = evidencia.transacciones.filter((tx) => {
+    const huella = JSON.stringify([
+      tx.transactionId, tx.status, tx.amount, tx.amountBreakdown.base, tx.amountBreakdown.tip,
+      tx.amountBreakdown.fee, tx.currency, tx.paymentMethod, tx.payableType, tx.payableId,
+      tx.dateCreated, tx.datePaid, Object.entries(tx.metadata).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0),
+    ]);
+    if (vistas.has(huella)) return false;
+    vistas.add(huella);
+    return true;
+  });
+  return { ...evidencia, transacciones };
+}
+
 function mismaTransaccion(a: TransaccionPey, b: TransaccionPey): boolean {
   return a.transactionId === b.transactionId && a.status === "PAID" && b.status === "PAID" &&
     a.payableType === b.payableType && a.payableId === b.payableId && a.currency === b.currency &&
@@ -128,13 +143,13 @@ export const aplicarEvidencia = internalMutation({
       throw new ConvexError({ codigo: "NO_ENCONTRADO", mensaje: "No se encontró el intento." });
     }
     if (!intento.peyPayableId) return { ok: true, resultado: "sin_pago" };
-    const evidencia = args.evidencia as Evidencia;
+    const evidencia = evidenciaSinRepeticiones(args.evidencia as Evidencia);
     const evaluado = evaluar({
       tipo: intento.tipo, peyPayableId: intento.peyPayableId, intentoPublicId: intento.publicId,
       montoCentavos: intento.montoCentavos, destino: intento.destino,
     }, evidencia);
     if (evaluado.resultado === "sin_pago") return { ok: true, resultado: "sin_pago" };
-    const veredicto = args.evidencia.motivoCuenta
+    const veredicto = args.evidencia.motivoCuenta && (evaluado.resultado === "coincide" || evaluado.motivo === "destino_distinto")
       ? { resultado: "revisar" as const, motivo: args.evidencia.motivoCuenta, transacciones: evaluado.transacciones }
       : evaluado;
     const pagadas = [...new Map(veredicto.transacciones.map((tx) => [tx.transactionId, tx])).values()];
@@ -152,7 +167,7 @@ export const aplicarEvidencia = internalMutation({
     const liberado = cobro.estado === "liberado" || cobro.liberadoEn !== undefined;
     let resultadoPago: ResultadoPago = veredicto.resultado === "coincide" ? "coincide" : veredicto.motivo;
     if (tardio) resultadoPago = "pago_tardio";
-    if (liberado) resultadoPago = "duplicado";
+    if (liberado || (cobro.estado === "en_revision" && veredicto.resultado === "coincide")) resultadoPago = "duplicado";
     const pagosInsertados: Id<"pagos">[] = [];
     let nuevasBaseCentavos = 0;
     for (const transaccion of nuevas) {
@@ -192,14 +207,15 @@ export const aplicarEvidencia = internalMutation({
       return { ok: true, resultado: "duplicado" };
     }
     if (cobro.estado === "en_revision") {
+      if (veredicto.resultado === "coincide") await ctx.db.patch(cobro._id, { alerta: "pago_duplicado", actualizadoEn: ahora });
       for (const pagoId of pagosInsertados) {
         await registrar(ctx, {
-          negocioId: negocio._id, modo: negocio.modo, tipo: veredicto.resultado === "revisar" ? "pago.no_coincide" : "pago.verificado", cobroId: cobro._id,
+          negocioId: negocio._id, modo: negocio.modo, tipo: veredicto.resultado === "revisar" ? "pago.no_coincide" : "pago.duplicado", cobroId: cobro._id,
           intentoId: intento._id, pagoId, actor: { tipo: "pey" },
-          detalle: veredicto.resultado === "revisar" ? { motivo: veredicto.motivo } : {}, en: ahora,
+          detalle: { motivo: veredicto.resultado === "revisar" ? veredicto.motivo : "duplicado" }, en: ahora,
         });
       }
-      return { ok: true, resultado: veredicto.resultado === "revisar" ? veredicto.motivo : "en_revision" };
+      return { ok: true, resultado: veredicto.resultado === "revisar" ? veredicto.motivo : "duplicado" };
     }
     if (tardio) {
       const nuevoEstado = transicionarCobro(cobro.estado, "pago_tardio");

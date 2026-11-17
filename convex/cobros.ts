@@ -72,7 +72,9 @@ export const obtener = query({
     if (!cobro || cobro.negocioId !== negocioId || cobro.modo !== modo) return null;
     const intento = cobro.intentoActivoId ? await ctx.db.get(cobro.intentoActivoId) : null;
     const intentoValido = intento && intento.negocioId === negocioId && intento.cobroId === cobro._id && intento.modo === modo ? intento : null;
-    const pagos = await ctx.db.query("pagos").withIndex("by_cobro", (q) => q.eq("cobroId", cobro._id)).order("desc").first();
+    const pagos = cobro.pagoId
+      ? await ctx.db.get(cobro.pagoId)
+      : await ctx.db.query("pagos").withIndex("by_cobro", (q) => q.eq("cobroId", cobro._id)).order("desc").first();
     return {
       publicId: cobro.publicId, folio: cobro.folio, concepto: cobro.concepto, montoCentavos: cobro.montoCentavos,
       estado: cobro.estado, ...(cobro.alerta ? { alerta: cobro.alerta } : {}), creadoEn: cobro.creadoEn, expiraEn: cobro.expiraEn,
