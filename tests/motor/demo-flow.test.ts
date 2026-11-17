@@ -354,7 +354,7 @@ describe("persisted DEMO engine at the Convex caller boundary", () => {
     expect(estado.bitacora.some((entrada) => entrada.tipo === "cobro.liberado")).toBe(false);
   });
 
-  it("claims a duplicated link id only once and replays without throwing", async () => {
+  it.each(["identical", "metadata order", "amount", "metadata", "dateCreated"])("claims repeated link evidence safely: %s", async (difference) => {
     const t = nuevoHarness();
     await t.mutation(api.cobros.crear, {
       claveIdempotencia: "duplicate-link-id-0001", concepto: "Pedido de ejemplo", montoCentavos: 14900, tipo: "link",
@@ -368,46 +368,31 @@ describe("persisted DEMO engine at the Convex caller boundary", () => {
       payableType: "PAYMENT_LINK" as const, payableId: intento.peyPayableId!,
       dateCreated: "2026-11-14T11:00:00.000Z", datePaid: "2026-11-14T11:01:00.000Z", metadata: {},
     };
+    const first = { ...tx, metadata: { first: "example", second: "fixture" } };
+    const second = {
+      ...first,
+      ...(difference === "metadata order" ? { metadata: { second: "fixture", first: "example" } } : {}),
+      ...(difference === "amount" ? { amount: 150, amountBreakdown: { base: 150, tip: 0, fee: 0 } } : {}),
+      ...(difference === "metadata" ? { metadata: { first: "different", second: "fixture" } } : {}),
+      ...(difference === "dateCreated" ? { dateCreated: "2026-11-14T10:00:00.000Z" } : {}),
+    };
+    const clean = difference === "identical" || difference === "metadata order";
     const args = {
       intentoId: intento._id, origen: "sondeo" as const,
-      evidencia: { transacciones: [tx, tx], link: {
+      evidencia: { transacciones: [first, second], link: {
         status: "paid" as const, amount: 149, clientReferenceId: intento.publicId, metadata: {},
         transactions: [{ transactionId: tx.transactionId }, { transactionId: tx.transactionId }],
       } },
     };
-    await t.mutation(internal.motor.verificar.aplicarEvidencia, args);
-    expect((await leerEstado(t)).pagos).toHaveLength(1);
+    await expect(t.mutation(internal.motor.verificar.aplicarEvidencia, args))
+      .resolves.toEqual({ ok: true, resultado: clean ? "coincide" : "duplicado" });
+    const state = await leerEstado(t);
+    expect(state.pagos).toHaveLength(1);
+    expect(state.cobros[0].estado).toBe(clean ? "liberado" : "en_revision");
+    expect(state.bitacora.filter((row) => row.tipo === "cobro.liberado")).toHaveLength(clean ? 1 : 0);
     await expect(t.mutation(internal.motor.verificar.aplicarEvidencia, args))
       .resolves.toEqual({ ok: true, resultado: "repetido" });
     expect((await leerEstado(t)).pagos).toHaveLength(1);
-  });
-
-  it("records clean evidence in review without automatic release or counter changes", async () => {
-    const t = nuevoHarness();
-    await crearCobro(t, "review-clean-evidence-001");
-    await terminarTrabajos(t);
-    const initial = await leerEstado(t);
-    const intento = initial.intentos[0];
-    await t.run(async (ctx) => {
-      await ctx.db.patch(intento.cobroId, { estado: "en_revision", motivoRevision: "monto_distinto" });
-      await ctx.db.patch(intento.negocioId, { enRevisionCount: 1 });
-    });
-    const tx = {
-      transactionId: "clean-review-payment", status: "PAID" as const, amount: 149,
-      amountBreakdown: { base: 149, tip: 0, fee: 0 }, currency: "MXN", paymentMethod: "CODI" as const,
-      payableType: "API_CODI_QR" as const, payableId: intento.peyPayableId!,
-      dateCreated: "2026-11-14T11:00:00.000Z", datePaid: "2026-11-14T11:01:00.000Z", metadata: {},
-    };
-    await expect(t.mutation(internal.motor.verificar.aplicarEvidencia, {
-      intentoId: intento._id, origen: "sondeo", evidencia: { transacciones: [tx], destinoConfirmado: true },
-    })).resolves.toEqual({ ok: true, resultado: "en_revision" });
-    const result = await leerEstado(t);
-    expect(result.cobros[0]).toMatchObject({ estado: "en_revision", motivoRevision: "monto_distinto" });
-    expect(result.cobros[0].liberadoEn).toBeUndefined();
-    expect(result.negocios[0].enRevisionCount).toBe(1);
-    expect(result.pagos).toHaveLength(1);
-    expect(result.bitacora.some((row) => row.pagoId === result.pagos[0]._id && row.tipo === "pago.verificado")).toBe(true);
-    expect(result.bitacora.some((row) => row.tipo === "cobro.liberado")).toBe(false);
   });
 
   it("holds a mismatched amount for review rather than releasing", async () => {

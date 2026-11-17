@@ -33,6 +33,92 @@ afterEach(() => {
 });
 
 describe("LIVE QR verification and heartbeat at the Convex caller boundary", () => {
+  it.each(["clean", "tip", "card"])("retains the first review reason after a discarded QR receives %s evidence", async (variant) => {
+    const t = nuevoLiveHarness();
+    const negocioId = await insertarNegocioLive(t);
+    const { intentoId, cobroId, cobroPublicId } = await insertarIntentoLive(t, negocioId);
+    const oldQr = "OLD-QR-EXAMPLE";
+    const discardedId = await t.run(async (ctx) => {
+      const current = (await ctx.db.get(intentoId))!;
+      const { _id, _creationTime, ...fields } = current;
+      void _id; void _creationTime;
+      return ctx.db.insert("intentos", {
+        ...fields, publicId: "int_discarded_example", estado: "descartado", peyPayableId: oldQr,
+        claveIdempotencia: "discarded-example-key",
+      });
+    });
+    const wrong = transaccionWire(TX_ID, { amount: 0.02, amountBreakdown: { base: 0.02, tip: 0, fee: 0 } });
+    const later = transaccionWire(ID_TX_2, {
+      payableId: oldQr,
+      ...(variant === "tip" ? { amount: 0.02, amountBreakdown: { base: 0.01, tip: 0.01, fee: 0 } } : {}),
+      ...(variant === "card" ? { paymentMethod: "CARD" } : {}),
+    });
+    const fetcher = fixtureFetch((url) => {
+      if (url.pathname === `/transaction/codi/qr/${QR_ID}`) return respuestaJson(200, { items: [{ id: TX_ID }], nextToken: null });
+      if (url.pathname === `/transaction/codi/qr/${oldQr}`) return respuestaJson(200, { items: [{ id: ID_TX_2 }], nextToken: null });
+      if (url.pathname === `/transaction/${TX_ID}`) return respuestaJson(200, wrong);
+      if (url.pathname === `/transaction/${ID_TX_2}`) return respuestaJson(200, later);
+      if (url.pathname === `/transaction/bank-account/${BANK_ID}`) return respuestaJson(200, { items: [wrong, later], nextToken: null });
+      throw new Error("unexpected fake pey request");
+    });
+    await expect(t.action(internal.motor.verificar.verificarIntento, { intentoId, origen: "sondeo" }))
+      .resolves.toEqual({ ok: true, resultado: "monto_distinto" });
+    const first = await t.run(async (ctx) => ({ cobro: (await ctx.db.get(cobroId))!, negocio: (await ctx.db.get(negocioId))! }));
+    expect(first.cobro).toMatchObject({ estado: "en_revision", motivoRevision: "monto_distinto" });
+    expect(first.cobro.pagoId).toBeDefined();
+    expect(first.negocio.enRevisionCount).toBe(1);
+    vi.advanceTimersByTime(1_000);
+    const result = await t.action(internal.motor.verificar.verificarIntento, { intentoId: discardedId, origen: "barrido" });
+    const state = await t.run(async (ctx) => ({
+      cobro: (await ctx.db.get(cobroId))!, negocio: (await ctx.db.get(negocioId))!,
+      pagos: await ctx.db.query("pagos").withIndex("by_cobro", (q) => q.eq("cobroId", cobroId)).collect(),
+      log: await ctx.db.query("bitacora").collect(),
+    }));
+    const expected = variant === "clean" ? "duplicado" : variant === "tip" ? "con_propina" : "metodo_no_permitido";
+    expect(state.cobro).toMatchObject({ estado: "en_revision", motivoRevision: "monto_distinto", pagoId: first.cobro.pagoId });
+    expect(state.cobro.liberadoEn).toBeUndefined();
+    expect(state.negocio.enRevisionCount).toBe(first.negocio.enRevisionCount);
+    expect(state.pagos).toHaveLength(2);
+    expect(state.pagos.find((pago) => pago.peyTransactionId === ID_TX_2)?.resultado).toBe(expected);
+    expect(result).toEqual({ ok: true, resultado: expected });
+    expect(state.log.filter((row) => row.tipo === "pago.verificado" || row.tipo === "cobro.liberado")).toHaveLength(0);
+    const eventType = variant === "clean" ? "pago.duplicado" : "pago.no_coincide";
+    expect(state.log.filter((row) => row.tipo === eventType && row.intentoId === discardedId))
+      .toMatchObject([{ detalle: { motivo: expected } }]);
+    expect(state.cobro.alerta).toBe(variant === "clean" ? "pago_duplicado" : undefined);
+    const detail = await t.withIdentity({ email: "owner@example.invalid", emailVerified: true })
+      .query(api.cobros.obtener, { publicId: cobroPublicId });
+    expect(detail?.pago?.resultado).toBe("monto_distinto");
+    expect(fetcher.mock.calls.map(([input]) => new URL(String(input)).pathname)).toEqual([
+      `/transaction/codi/qr/${QR_ID}`, `/transaction/${TX_ID}`, `/transaction/bank-account/${BANK_ID}`,
+      `/transaction/codi/qr/${oldQr}`, `/transaction/${ID_TX_2}`, `/transaction/bank-account/${BANK_ID}`,
+    ]);
+  });
+
+  it.each([
+    { variant: "tip", overrides: { amount: 0.02, amountBreakdown: { base: 0.01, tip: 0.01, fee: 0 } }, expected: "con_propina" },
+    { variant: "card", overrides: { paymentMethod: "CARD" }, expected: "metodo_no_permitido" },
+    { variant: "destination only", overrides: {}, expected: "monto_distinto" },
+  ])("preserves earlier policy reasons over account amount conflicts: $variant", async ({ overrides, expected }) => {
+    const t = nuevoLiveHarness();
+    const negocioId = await insertarNegocioLive(t);
+    const { intentoId, cobroId } = await insertarIntentoLive(t, negocioId);
+    fixtureFetch((url) => {
+      if (url.pathname === `/transaction/codi/qr/${QR_ID}`) return respuestaJson(200, { items: [{ id: TX_ID }], nextToken: null });
+      if (url.pathname === `/transaction/${TX_ID}`) return respuestaJson(200, transaccionWire(TX_ID, overrides));
+      if (url.pathname === `/transaction/bank-account/${BANK_ID}`) return respuestaJson(200, {
+        items: [transaccionWire(TX_ID, { ...overrides, amount: 0.03, amountBreakdown: { base: 0.02, tip: 0.01, fee: 0 } })], nextToken: null,
+      });
+      throw new Error("unexpected fake pey request");
+    });
+    await expect(t.action(internal.motor.verificar.verificarIntento, { intentoId, origen: "sondeo" }))
+      .resolves.toEqual({ ok: true, resultado: expected });
+    const state = await t.run(async (ctx) => ({ cobro: await ctx.db.get(cobroId), pagos: await ctx.db.query("pagos").collect() }));
+    expect(state.cobro).toMatchObject({ estado: "en_revision", motivoRevision: expected });
+    expect(state.cobro?.liberadoEn).toBeUndefined();
+    expect(state.pagos[0].resultado).toBe(expected);
+  });
+
   it("requires account-list membership from a later page before releasing", async () => {
     const t = nuevoLiveHarness();
     const negocioId = await insertarNegocioLive(t);
