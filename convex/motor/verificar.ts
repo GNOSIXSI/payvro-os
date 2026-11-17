@@ -85,7 +85,7 @@ export const datosIntento = internalQuery({
     publicId: v.string(), tipo: v.union(v.literal("link"), v.literal("qr")), estado: v.string(),
     peyPayableId: v.union(v.string(), v.null()), destino: v.union(v.literal("cuenta_de_la_llave"), v.literal("bank_account_id")),
     cobroId: v.id("cobros"), cobroPublicId: v.string(), montoCentavos: v.number(), estadoCobro: estadoCobroValidator,
-    expiraEn: v.number(), modoNegocio: v.union(v.literal("demo"), v.literal("live")),
+    creadoEn: v.number(), expiraEn: v.number(), modoNegocio: v.union(v.literal("demo"), v.literal("live")),
   })),
   handler: async (ctx, args) => {
     const intento = await ctx.db.get(args.intentoId);
@@ -97,7 +97,7 @@ export const datosIntento = internalQuery({
       intentoId: intento._id, negocioId: negocio._id, modo: intento.modo, publicId: intento.publicId,
       tipo: intento.tipo, estado: intento.estado, peyPayableId: intento.peyPayableId ?? null,
       destino: intento.destino, cobroId: cobro._id, cobroPublicId: cobro.publicId,
-      montoCentavos: cobro.montoCentavos, estadoCobro: cobro.estado, expiraEn: cobro.expiraEn, modoNegocio: negocio.modo,
+      montoCentavos: cobro.montoCentavos, estadoCobro: cobro.estado, creadoEn: intento.creadoEn, expiraEn: cobro.expiraEn, modoNegocio: negocio.modo,
     };
   },
 });
@@ -328,7 +328,13 @@ export const verificarIntento = internalAction({
           for (let paginaNumero = 0; paginaNumero < MAX_PAGINAS_CUENTA; paginaNumero += 1) {
             if (!(await leaseSondeoDisponible(ctx, args.intentoId, args.leaseId))) return { ok: false, resultado: "sondeo_deteniendo" };
             const pagina = await puerto.listarTransaccionesCuenta(token);
-            if (pagina.idsDescartadas.some((id) => id === null || relevantes.some((tx) => tx.transactionId === id))) pruebaInconclusa = true;
+            if (pagina.idsDescartadas.some((id, index) => {
+              if (id !== null) return relevantes.some((tx) => tx.transactionId === id);
+              const dato = pagina.datosDescartadas?.[index];
+              const montoCompatible = dato?.baseCentavos == null || dato.baseCentavos === datos.montoCentavos;
+              const fechaCompatible = dato?.pagadoEn == null || (dato.pagadoEn >= datos.creadoEn && dato.pagadoEn <= datos.expiraEn);
+              return montoCompatible && fechaCompatible;
+            })) pruebaInconclusa = true;
             for (const row of pagina.transactions) {
               const objetivo = relevantes.find((tx) => tx.transactionId === row.transactionId);
               if (objetivo && mismaTransaccion(objetivo, row)) encontrados.add(row.transactionId);

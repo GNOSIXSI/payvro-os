@@ -172,20 +172,36 @@ export function normalizarPaginaTransacciones(value: unknown): PaginaTransaccion
   const { items, nextToken } = pageParts(value);
   const transactions: TransaccionPey[] = [];
   const idsDescartadas: (string | null)[] = [];
+  const datosDescartadas: NonNullable<PaginaTransacciones["datosDescartadas"]> = [];
   for (const item of items) {
     try {
       identidadPayable(item);
+      validarUlid(record(item).id);
     } catch {
       try {
         idsDescartadas.push(validarUlid(record(item).id));
       } catch {
         idsDescartadas.push(null);
       }
+      let baseCentavos: number | null = null;
+      let pagadoEn: number | null = null;
+      try {
+        const base = pesos(record(record(item).amountBreakdown).base, true);
+        baseCentavos = base === 0 ? 0 : aCentavos(base);
+      } catch {
+        // Unknown amounts cannot exclude a candidate.
+      }
+      try {
+        pagadoEn = Date.parse(fechaIsoDesdeSegundos(record(item).datePaid));
+      } catch {
+        // Unknown payment times cannot exclude a candidate.
+      }
+      datosDescartadas.push({ baseCentavos, pagadoEn });
       continue;
     }
     transactions.push(normalizarTransaccionPey(item));
   }
-  return { transactions, nextToken, descartadas: idsDescartadas.length, idsDescartadas };
+  return { transactions, nextToken, descartadas: idsDescartadas.length, idsDescartadas, datosDescartadas };
 }
 
 export function normalizarRespuestaQr(value: unknown): { id: string; qrString: string } {
