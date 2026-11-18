@@ -171,17 +171,21 @@ export function normalizarPaginaReferencias(value: unknown): PaginaReferenciasTr
 export function normalizarPaginaTransacciones(value: unknown): PaginaTransacciones {
   const { items, nextToken } = pageParts(value);
   const transactions: TransaccionPey[] = [];
-  let descartadas = 0;
+  const idsDescartadas: (string | null)[] = [];
   for (const item of items) {
     try {
       identidadPayable(item);
     } catch {
-      descartadas += 1;
+      try {
+        idsDescartadas.push(validarUlid(record(item).id));
+      } catch {
+        idsDescartadas.push(null);
+      }
       continue;
     }
     transactions.push(normalizarTransaccionPey(item));
   }
-  return { transactions, nextToken, descartadas };
+  return { transactions, nextToken, descartadas: idsDescartadas.length, idsDescartadas };
 }
 
 export function normalizarRespuestaQr(value: unknown): { id: string; qrString: string } {
