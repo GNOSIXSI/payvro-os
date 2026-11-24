@@ -111,7 +111,9 @@ it.each(["valid", "negocio", "cobro", "modo"])("owner detail validates linked pa
 it("deduplicates old observation deliveries even after another check and a readable reset", async () => {
   const s = await escenario();
   await Promise.all([s.poll("check-1"), s.poll("check-1")]);
-  await s.poll("check-2"); await s.poll("check-1");
+  await s.poll("check-2");
+  expect((await s.detail())?.estado).toBe("esperando_pago");
+  await s.poll("check-1");
   expect((await s.detail())?.estado).toBe("esperando_pago");
   s.setPaid(false); await s.poll("reset"); s.setPaid(true);
   await s.poll("check-1"); await s.poll("check-2");
