@@ -276,7 +276,7 @@ describe("persisted DEMO engine at the Convex caller boundary", () => {
     expect(estado.negocios[0]?.enRevisionCount).toBe(1);
     expect(estado.bitacora.filter((entrada) => entrada.tipo === "cobro.en_revision")).toHaveLength(1);
     expect(estado.bitacora.some((entrada) => entrada.tipo === "cobro.liberado" || entrada.tipo === "pago.verificado")).toBe(false);
-    expect(estado.bitacora.some((entrada) => entrada.tipo === "pago.no_coincide" && entrada.detalle.motivo === "duplicado")).toBe(true);
+    expect(estado.bitacora.some((entrada) => entrada.tipo === "pago.duplicado" && entrada.detalle.motivo === "duplicado")).toBe(true);
 
     await expect(t.mutation(internal.motor.verificar.aplicarEvidencia, {
       intentoId: intento._id,
@@ -354,7 +354,9 @@ describe("persisted DEMO engine at the Convex caller boundary", () => {
     expect(estado.bitacora.some((entrada) => entrada.tipo === "cobro.liberado")).toBe(false);
   });
 
-  it.each(["identical", "metadata order", "amount", "metadata", "dateCreated"])("claims repeated link evidence safely: %s", async (difference) => {
+  it.each(["identical", "metadata order", "amount", "metadata", "dateCreated"].flatMap((difference) =>
+    [false, true].map((reverse) => ({ difference, reverse })),
+  ))("claims repeated link evidence safely: $difference / reversed=$reverse", async ({ difference, reverse }) => {
     const t = nuevoHarness();
     await t.mutation(api.cobros.crear, {
       claveIdempotencia: "duplicate-link-id-0001", concepto: "Pedido de ejemplo", montoCentavos: 14900, tipo: "link",
@@ -379,7 +381,7 @@ describe("persisted DEMO engine at the Convex caller boundary", () => {
     const clean = difference === "identical" || difference === "metadata order";
     const args = {
       intentoId: intento._id, origen: "sondeo" as const,
-      evidencia: { transacciones: [first, second], link: {
+      evidencia: { transacciones: reverse ? [second, first] : [first, second], link: {
         status: "paid" as const, amount: 149, clientReferenceId: intento.publicId, metadata: {},
         transactions: [{ transactionId: tx.transactionId }, { transactionId: tx.transactionId }],
       } },
@@ -387,12 +389,21 @@ describe("persisted DEMO engine at the Convex caller boundary", () => {
     await expect(t.mutation(internal.motor.verificar.aplicarEvidencia, args))
       .resolves.toEqual({ ok: true, resultado: clean ? "coincide" : "duplicado" });
     const state = await leerEstado(t);
-    expect(state.pagos).toHaveLength(1);
+    expect(state.pagos).toHaveLength(clean ? 1 : 0);
+    const detail = await t.query(api.cobros.obtener, { publicId: state.cobros[0].publicId });
+    if (!clean) {
+      expect(detail?.pago).toBeNull();
+      expect(detail?.alerta).toBe("pago_duplicado");
+      expect(state.cobros[0].motivoRevision).toBe("duplicado");
+      expect(state.bitacora.filter((row) => row.tipo === "pago.duplicado")).toHaveLength(1);
+    }
     expect(state.cobros[0].estado).toBe(clean ? "liberado" : "en_revision");
     expect(state.bitacora.filter((row) => row.tipo === "cobro.liberado")).toHaveLength(clean ? 1 : 0);
     await expect(t.mutation(internal.motor.verificar.aplicarEvidencia, args))
       .resolves.toEqual({ ok: true, resultado: "repetido" });
-    expect((await leerEstado(t)).pagos).toHaveLength(1);
+    const replay = await leerEstado(t);
+    expect(replay.pagos).toHaveLength(clean ? 1 : 0);
+    expect(replay.bitacora).toEqual(state.bitacora);
   });
 
   it.each([true, false])("applies account amount conflicts to otherwise clean evidence (destination confirmed: %s)", async (destinoConfirmado) => {

@@ -236,14 +236,14 @@ describe("LIVE QR verification and heartbeat at the Convex caller boundary", () 
       await t.run((ctx) => registrar(ctx, { negocioId, modo: "live", tipo: "evento.recibido", cobroId, intentoId, actor: { tipo: "sistema" }, detalle: { origen: "simulador" } }));
       await t.action(internal.motor.verificar.verificarIntento, { intentoId, origen: "sondeo" });
       const after = await t.run((ctx) => ctx.db.query("bitacora").withIndex("by_cobro_seq", (q) => q.eq("cobroId", cobroId)).collect());
-      expect(after.map((row) => row.tipo)).toEqual(["pey.dato_ilegible", "evento.recibido", "pey.dato_ilegible"]);
+      expect(after.map((row) => row.tipo)).toEqual(["pey.dato_ilegible", "evento.recibido", "cobro.en_revision", "pey.dato_ilegible"]);
       const unchanged = await t.run(async (ctx) => ({
         cobro: await ctx.db.get(cobroId), negocio: await ctx.db.get(negocioId),
         pagos: await ctx.db.query("pagos").withIndex("by_cobro", (q) => q.eq("cobroId", cobroId)).collect(),
       }));
-      expect(unchanged.cobro).toEqual(before.cobro);
+      expect(unchanged.cobro).toMatchObject({ estado: "en_revision", motivoRevision: "evidencia_ilegible" });
       expect(unchanged.pagos).toEqual([]);
-      expect(unchanged.negocio?.enRevisionCount).toBe(before.negocio?.enRevisionCount);
+      expect(unchanged.negocio?.enRevisionCount).toBe((before.negocio?.enRevisionCount ?? 0) + 1);
     }
     if (resultado === "coincide") {
       expect(result.cobro?.estado).toBe("liberado");

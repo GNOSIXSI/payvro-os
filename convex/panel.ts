@@ -12,7 +12,7 @@ const actorTipo = v.union(v.literal("dueno"), v.literal("sistema"), v.literal("p
 const detalle = v.object({
   motivo: v.optional(v.union(
     v.literal("monto_distinto"), v.literal("destino_distinto"), v.literal("metodo_no_permitido"),
-    v.literal("con_propina"), v.literal("duplicado"), v.literal("pago_tardio"), v.literal("parcial"),
+    v.literal("con_propina"), v.literal("duplicado"), v.literal("pago_tardio"), v.literal("parcial"), v.literal("evidencia_ilegible"),
   )),
   httpStatus: v.optional(v.number()), requestId: v.optional(v.string()), conteo: v.optional(v.number()),
 });
@@ -22,12 +22,12 @@ const entrada = v.object({
   estadoAntes: v.optional(estadoCobro), estadoDespues: v.optional(estadoCobro), detalle, en: v.number(),
 });
 const motivoPublico = new Set([
-  "monto_distinto", "destino_distinto", "metodo_no_permitido", "con_propina", "duplicado", "pago_tardio", "parcial",
+  "monto_distinto", "destino_distinto", "metodo_no_permitido", "con_propina", "duplicado", "pago_tardio", "parcial", "evidencia_ilegible",
 ]);
 
 function detallePublico(valor: Record<string, unknown>) {
   return {
-    ...(typeof valor.motivo === "string" && motivoPublico.has(valor.motivo) ? { motivo: valor.motivo as "monto_distinto" | "destino_distinto" | "metodo_no_permitido" | "con_propina" | "duplicado" | "pago_tardio" | "parcial" } : {}),
+    ...(typeof valor.motivo === "string" && motivoPublico.has(valor.motivo) ? { motivo: valor.motivo as "monto_distinto" | "destino_distinto" | "metodo_no_permitido" | "con_propina" | "duplicado" | "pago_tardio" | "parcial" | "evidencia_ilegible" } : {}),
     ...(typeof valor.httpStatus === "number" ? { httpStatus: valor.httpStatus } : {}),
     ...(typeof valor.requestId === "string" ? { requestId: valor.requestId } : {}),
     ...(typeof valor.conteo === "number" ? { conteo: valor.conteo } : {}),

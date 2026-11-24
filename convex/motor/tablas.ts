@@ -23,7 +23,7 @@ const detalleBitacora = v.object({
   httpStatus: v.optional(v.number()),
   motivo: v.optional(v.union(
     v.literal("monto_distinto"), v.literal("destino_distinto"), v.literal("metodo_no_permitido"),
-    v.literal("con_propina"), v.literal("duplicado"), v.literal("pago_tardio"), v.literal("parcial"), v.literal("incierto_60s"), v.literal("cobro_cancelado"), v.literal("cobro_expirado"),
+    v.literal("con_propina"), v.literal("duplicado"), v.literal("pago_tardio"), v.literal("parcial"), v.literal("incierto_60s"), v.literal("cobro_cancelado"), v.literal("cobro_expirado"), v.literal("evidencia_ilegible"),
   )),
   origen: v.optional(v.literal("simulador")),
   pausados: v.optional(v.boolean()),
@@ -42,6 +42,7 @@ export const tablasMotor = {
     concepto: v.string(), montoCentavos: v.number(), tipoInicial: v.optional(v.union(v.literal("qr"), v.literal("link"))),
     moneda: v.literal("MXN"), estado: cobroEstado,
     motivoRevision: v.optional(v.string()), alerta: v.optional(v.literal("pago_duplicado")),
+    conflictoEvidencia: v.optional(v.boolean()),
     intentoActivoId: v.optional(v.id("intentos")), pagoId: v.optional(v.id("pagos")), expiraEn: v.number(),
     claveIdempotencia: v.string(), claveCancelacion: v.optional(v.string()), creadoPor: v.object({ tipo: v.string(), id: v.optional(v.string()) }),
     creadoEn: v.number(), actualizadoEn: v.number(), verificadoEn: v.optional(v.number()), liberadoEn: v.optional(v.number()),
@@ -61,12 +62,14 @@ export const tablasMotor = {
     vigiladoHasta: v.optional(v.number()), sondeoActivo: v.boolean(), sondeos: v.number(),
     sondeoInicioEn: v.optional(v.number()), sondeoLeaseHasta: v.optional(v.number()),
     sondeoLeaseId: v.optional(v.string()), sondeoBackoffMs: v.optional(v.number()),
+    evidenciaPendiente: v.optional(v.boolean()), ilegiblesConsecutivos: v.optional(v.number()),
     ultimaVerificacionEn: v.optional(v.number()), barridoActivo: v.optional(v.boolean()),
     siguienteBarridoEn: v.optional(v.number()), claveIdempotencia: v.string(), creadoEn: v.number(),
     postIniciadoEn: v.optional(v.number()), inciertoEn: v.optional(v.number()),
   })
     .index("by_publicId", ["publicId"])
     .index("by_cobro", ["cobroId"])
+    .index("by_cobro_evidenciaPendiente", ["cobroId", "evidenciaPendiente"])
     .index("by_peyPayableId", ["peyPayableId"])
     .index("by_negocio_estado", ["negocioId", "estado"])
     .index("by_negocio_creadoEn", ["negocioId", "creadoEn"])

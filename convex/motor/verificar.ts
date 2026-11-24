@@ -10,6 +10,7 @@ import { nuevoId } from "@payvro/engine/ids";
 import { registrar } from "./bitacora";
 import { crearPeyPuerto } from "./peyPuerto";
 import { liberar } from "./liberar";
+import { revisarEvidenciaPendiente } from "./cobros";
 
 const estadoCobroValidator = v.union(
   v.literal("borrador"), v.literal("esperando_pago"), v.literal("pagado_verificado"),
@@ -37,6 +38,8 @@ const SONDEO_CADENA_MS = 15 * 60 * 1000;
 const SONDEO_LEASE_MS = 60_000;
 const BARRIDO_INTERVALO_MS = 45_000;
 const BARRIDO_DESCARTADO_MS = 60_000;
+// Provisional draft policy, not a production retry decision. Distinct completed checks only.
+const UMBRAL_ILEGIBLES_CONSECUTIVOS = 3;
 
 function mismoMonto(a: TransaccionPey, b: TransaccionPey): boolean {
   return a.amount === b.amount && a.amountBreakdown.base === b.amountBreakdown.base &&
@@ -128,7 +131,10 @@ export const registrarLectura = internalMutation({
 });
 
 export const registrarDatoIlegible = internalMutation({
-  args: { intentoId: v.id("intentos") },
+  args: {
+    intentoId: v.id("intentos"), observacionId: v.string(),
+    legible: v.boolean(), origen: origenValidator, registrarEvento: v.optional(v.boolean()),
+  },
   returns: v.null(),
   handler: async (ctx, args) => {
     const intento = await ctx.db.get(args.intentoId);
@@ -137,6 +143,26 @@ export const registrarDatoIlegible = internalMutation({
     if (!intento || !cobro || !negocio || intento.negocioId !== cobro.negocioId || cobro.negocioId !== negocio._id || intento.modo !== cobro.modo || cobro.modo !== negocio.modo) {
       throw new ConvexError({ codigo: "NO_ENCONTRADO", mensaje: "No se encontró el intento." });
     }
+    const webhookId = `verificacion:${intento._id}:${args.observacionId}`;
+    const recibo = await ctx.db.query("eventosPey").withIndex("by_negocio_webhookId", (q) => q.eq("negocioId", negocio._id).eq("webhookId", webhookId)).unique();
+    if (recibo) return null;
+    await ctx.db.insert("eventosPey", {
+      negocioId: negocio._id, modo: negocio.modo, publicId: nuevoId("evt_"), origen: args.origen,
+      webhookId, tipo: "verificacion.observada", hashCuerpo: "", recibidoEn: Date.now(), procesadoEn: Date.now(),
+      resultado: args.legible ? "legible" : "ilegible",
+    });
+    if (args.legible) {
+      if (intento.evidenciaPendiente || intento.ilegiblesConsecutivos) {
+        await ctx.db.patch(intento._id, { evidenciaPendiente: false, ilegiblesConsecutivos: 0 });
+      }
+      return null;
+    }
+    const consecutivos = (intento.ilegiblesConsecutivos ?? 0) + 1;
+    await ctx.db.patch(intento._id, { evidenciaPendiente: true, ilegiblesConsecutivos: consecutivos });
+    if (consecutivos >= UMBRAL_ILEGIBLES_CONSECUTIVOS || cobro.estado === "expirado") {
+      await revisarEvidenciaPendiente(ctx, cobro, negocio);
+    }
+    if (args.registrarEvento === false) return null;
     const ultima = await ctx.db.query("bitacora").withIndex("by_cobro_seq", (q) => q.eq("cobroId", cobro._id)).order("desc").first();
     if (ultima?.tipo === "pey.dato_ilegible") return null;
     await registrar(ctx, {
@@ -164,6 +190,22 @@ export const aplicarEvidencia = internalMutation({
     }
     if (!intento.peyPayableId) return { ok: true, resultado: "sin_pago" };
     const evidencia = evidenciaSinRepeticiones(args.evidencia as Evidencia);
+    const porId = new Map<string, TransaccionPey[]>();
+    for (const tx of evidencia.transacciones) porId.set(tx.transactionId, [...(porId.get(tx.transactionId) ?? []), tx]);
+    const conflicto = [...porId.values()].some((rows) => rows.length > 1 && rows.some((tx) =>
+      tx.status === "PAID" && tx.payableId === intento.peyPayableId &&
+      tx.payableType === (intento.tipo === "qr" ? "API_CODI_QR" : "PAYMENT_LINK")));
+    if (conflicto) {
+      if (cobro.conflictoEvidencia) return { ok: true, resultado: "repetido" };
+      // Neither version is payment truth. Persist the conflict, never an arbitrary amount.
+      await ctx.db.patch(cobro._id, { conflictoEvidencia: true, alerta: "pago_duplicado" });
+      await revisarEvidenciaPendiente(ctx, cobro, negocio, "duplicado");
+      await registrar(ctx, {
+        negocioId: negocio._id, modo: negocio.modo, tipo: "pago.duplicado", cobroId: cobro._id,
+        intentoId: intento._id, actor: { tipo: "pey" }, detalle: { motivo: "duplicado" },
+      });
+      return { ok: true, resultado: "duplicado" };
+    }
     const evaluado = evaluar({
       tipo: intento.tipo, peyPayableId: intento.peyPayableId, intentoPublicId: intento.publicId,
       montoCentavos: intento.montoCentavos, destino: intento.destino,
@@ -184,10 +226,11 @@ export const aplicarEvidencia = internalMutation({
     if (nuevas.length === 0) return { ok: true, resultado: "repetido" };
     const ahora = Date.now();
     const tardio = cobro.estado === "expirado" || cobro.estado === "cancelado";
-    const liberado = cobro.estado === "liberado" || cobro.liberadoEn !== undefined;
+    const liberado = cobro.estado === "liberado" || cobro.estado === "pagado_verificado" || cobro.liberadoEn !== undefined;
     let resultadoPago: ResultadoPago = veredicto.resultado === "coincide" ? "coincide" : veredicto.motivo;
     if (tardio) resultadoPago = "pago_tardio";
     if (liberado || (cobro.estado === "en_revision" && veredicto.resultado === "coincide")) resultadoPago = "duplicado";
+    if (resultadoPago === "duplicado") await ctx.db.patch(cobro._id, { alerta: "pago_duplicado", actualizadoEn: ahora });
     const pagosInsertados: Id<"pagos">[] = [];
     let nuevasBaseCentavos = 0;
     for (const transaccion of nuevas) {
@@ -230,7 +273,7 @@ export const aplicarEvidencia = internalMutation({
       if (veredicto.resultado === "coincide") await ctx.db.patch(cobro._id, { alerta: "pago_duplicado", actualizadoEn: ahora });
       for (const pagoId of pagosInsertados) {
         await registrar(ctx, {
-          negocioId: negocio._id, modo: negocio.modo, tipo: veredicto.resultado === "revisar" ? "pago.no_coincide" : "pago.duplicado", cobroId: cobro._id,
+          negocioId: negocio._id, modo: negocio.modo, tipo: resultadoPago === "duplicado" ? "pago.duplicado" : "pago.no_coincide", cobroId: cobro._id,
           intentoId: intento._id, pagoId, actor: { tipo: "pey" },
           detalle: { motivo: veredicto.resultado === "revisar" ? veredicto.motivo : "duplicado" }, en: ahora,
         });
@@ -276,7 +319,7 @@ export const aplicarEvidencia = internalMutation({
       await ctx.db.patch(cobro._id, { estado: nuevoEstado, motivoRevision: motivo, pagoId, verificadoEn: ahora, actualizadoEn: ahora });
       await ctx.db.patch(negocio._id, { enRevisionCount: (negocio.enRevisionCount ?? 0) + 1 });
       await registrar(ctx, {
-        negocioId: negocio._id, modo: negocio.modo, tipo: "pago.no_coincide", cobroId: cobro._id,
+        negocioId: negocio._id, modo: negocio.modo, tipo: motivo === "duplicado" ? "pago.duplicado" : "pago.no_coincide", cobroId: cobro._id,
         intentoId: intento._id, pagoId, actor: { tipo: "pey" }, detalle: { motivo }, en: ahora,
       });
       await registrar(ctx, {
@@ -291,7 +334,7 @@ export const aplicarEvidencia = internalMutation({
 });
 
 export const verificarIntento = internalAction({
-  args: { intentoId: v.id("intentos"), origen: origenValidator, leaseId: v.optional(v.string()) },
+  args: { intentoId: v.id("intentos"), origen: origenValidator, leaseId: v.optional(v.string()), observacionId: v.optional(v.string()) },
   returns: v.object({ ok: v.boolean(), resultado: v.string() }),
   handler: async (ctx, args): Promise<{ ok: boolean; resultado: string }> => {
     const modoConfigurado = await ctx.runQuery(internal.puertos.modoDeployment, {});
@@ -301,6 +344,8 @@ export const verificarIntento = internalAction({
     if (datos.estado !== "creado" && datos.estado !== "descartado" && datos.estado !== "pagado") return { ok: false, resultado: "sin_pago" };
     if (datos.modo === "live" && datos.tipo !== "qr") return { ok: false, resultado: "capacidad_no_disponible" };
 
+    // A lease identifies a scheduled check across delivery retries; other callers may supply a durable receipt id.
+    const observacionId = args.observacionId ?? args.leaseId ?? nuevoId("evt_");
     try {
       const puerto = crearPeyPuerto(ctx, datos.negocioId, datos.modo);
       let link: EvidenciaLink | undefined;
@@ -379,7 +424,9 @@ export const verificarIntento = internalAction({
             }
           }
           if (!destinoConfirmado && pruebaInconclusa) {
-            if (datoIlegible) await ctx.runMutation(internal.motor.verificar.registrarDatoIlegible, { intentoId: args.intentoId });
+            await ctx.runMutation(internal.motor.verificar.registrarDatoIlegible, {
+              intentoId: args.intentoId, observacionId, legible: false, origen: args.origen, registrarEvento: datoIlegible,
+            });
             await ctx.runMutation(internal.motor.verificar.registrarLectura, { intentoId: args.intentoId, exitosa: false });
             return { ok: false, resultado: "diferida" };
           }
@@ -396,6 +443,7 @@ export const verificarIntento = internalAction({
         ...(motivoCuenta ? { motivoCuenta } : {}),
       };
       const resultado = await ctx.runMutation(internal.motor.verificar.aplicarEvidencia, { intentoId: args.intentoId, evidencia, origen: args.origen });
+      await ctx.runMutation(internal.motor.verificar.registrarDatoIlegible, { intentoId: args.intentoId, observacionId, legible: true, origen: args.origen });
       await ctx.runMutation(internal.motor.verificar.registrarLectura, { intentoId: args.intentoId, exitosa: true });
       return resultado;
     } catch (error) {

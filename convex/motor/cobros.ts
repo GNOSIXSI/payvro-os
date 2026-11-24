@@ -2,7 +2,7 @@ import { ConvexError, v } from "convex/values";
 import { internal } from "../_generated/api";
 import { internalMutation } from "../_generated/server";
 import type { MutationCtx } from "../_generated/server";
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import { transicionarCobro, transicionarIntento } from "@payvro/engine";
 import type { EstadoCobro } from "@payvro/engine";
 import { nuevoId } from "@payvro/engine/ids";
@@ -202,6 +202,21 @@ export async function reintentarCobro(
   return { publicId: intento!.publicId, estado: "reservado" };
 }
 
+// Shared by expiry and verification: unresolved evidence is not proof of payment.
+export async function revisarEvidenciaPendiente(
+  ctx: MutationCtx, cobro: Doc<"cobros">, negocio: Doc<"negocios">,
+  motivo: "evidencia_ilegible" | "duplicado" = "evidencia_ilegible",
+): Promise<void> {
+  if (cobro.liberadoEn !== undefined || !["esperando_pago", "expirado", "cancelado"].includes(cobro.estado)) return;
+  const estado = transicionarCobro(cobro.estado, cobro.estado === "esperando_pago" ? "revisar" : "pago_tardio");
+  await ctx.db.patch(cobro._id, { estado, motivoRevision: motivo, actualizadoEn: Date.now() });
+  await ctx.db.patch(negocio._id, { enRevisionCount: (negocio.enRevisionCount ?? 0) + 1 });
+  await registrar(ctx, {
+    negocioId: negocio._id, modo: negocio.modo, cobroId: cobro._id, tipo: "cobro.en_revision",
+    actor: { tipo: "sistema" }, estadoAntes: cobro.estado, estadoDespues: estado, detalle: { motivo },
+  });
+}
+
 export const expirarVencidos = internalMutation({
   args: { cursor: v.optional(v.union(v.string(), v.null())) },
   returns: v.object({ expirados: v.number(), continuacion: v.boolean() }),
@@ -215,6 +230,11 @@ export const expirarVencidos = internalMutation({
       if (cobro.estado !== "esperando_pago") continue;
       const negocio = await ctx.db.get(cobro.negocioId);
       if (!negocio || negocio.modo !== cobro.modo) continue;
+      const pendiente = await ctx.db.query("intentos").withIndex("by_cobro_evidenciaPendiente", (q) => q.eq("cobroId", cobro._id).eq("evidenciaPendiente", true)).first();
+      if (pendiente) {
+        await revisarEvidenciaPendiente(ctx, cobro, negocio);
+        continue;
+      }
       const nuevoEstado = transicionarCobro(cobro.estado, "expirar");
       await ctx.db.patch(cobro._id, { estado: nuevoEstado, actualizadoEn: ahora });
       if (cobro.intentoActivoId) {
