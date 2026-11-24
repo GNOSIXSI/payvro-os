@@ -8,7 +8,7 @@ const tipos = new Set([
   "intento.incierto", "intento.fallido", "intento.descartado", "evento.recibido",
   "pago.verificado", "pago.no_coincide", "pago.duplicado", "cobro.en_revision",
   "cobro.liberado", "cobro.expirado", "cobro.cancelado", "negocio.actualizado",
-  "cobros.pausados",
+  "cobros.pausados", "pey.dato_ilegible",
 ]);
 const motivos = new Set([
   "monto_distinto", "destino_distinto", "metodo_no_permitido", "con_propina",
@@ -18,6 +18,7 @@ const keysPorTipo: Record<string, readonly string[]> = {
   "cobro.creado": ["folio", "montoCentavos"],
   "intento.reservado": ["tipo"],
   "pey.llamada": ["operacion"],
+  "pey.dato_ilegible": [],
   "intento.creado": [],
   "intento.incierto": ["causa"],
   "intento.fallido": ["httpStatus"],

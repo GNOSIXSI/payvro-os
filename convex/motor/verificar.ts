@@ -38,16 +38,30 @@ const SONDEO_LEASE_MS = 60_000;
 const BARRIDO_INTERVALO_MS = 45_000;
 const BARRIDO_DESCARTADO_MS = 60_000;
 
+function mismoMonto(a: TransaccionPey, b: TransaccionPey): boolean {
+  return a.amount === b.amount && a.amountBreakdown.base === b.amountBreakdown.base &&
+    a.amountBreakdown.tip === b.amountBreakdown.tip && a.amountBreakdown.fee === b.amountBreakdown.fee;
+}
+
+function evidenciaSinRepeticiones(evidencia: Evidencia): Evidencia {
+  const vistas = new Set<string>();
+  const transacciones = evidencia.transacciones.filter((tx) => {
+    const huella = JSON.stringify([
+      tx.transactionId, tx.status, tx.amount, tx.amountBreakdown.base, tx.amountBreakdown.tip,
+      tx.amountBreakdown.fee, tx.currency, tx.paymentMethod, tx.payableType, tx.payableId,
+      tx.dateCreated, tx.datePaid, Object.entries(tx.metadata).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0),
+    ]);
+    if (vistas.has(huella)) return false;
+    vistas.add(huella);
+    return true;
+  });
+  return { ...evidencia, transacciones };
+}
+
 function mismaTransaccion(a: TransaccionPey, b: TransaccionPey): boolean {
   return a.transactionId === b.transactionId && a.status === "PAID" && b.status === "PAID" &&
     a.payableType === b.payableType && a.payableId === b.payableId && a.currency === b.currency &&
-    a.paymentMethod === b.paymentMethod && a.amount === b.amount &&
-    a.amountBreakdown.base === b.amountBreakdown.base && a.amountBreakdown.tip === b.amountBreakdown.tip &&
-    a.amountBreakdown.fee === b.amountBreakdown.fee && a.datePaid === b.datePaid;
-}
-
-function idVistoSinConfirmar(objetivo: TransaccionPey, fila: TransaccionPey): boolean {
-  return fila.transactionId === objetivo.transactionId && fila.status !== "PAID";
+    a.paymentMethod === b.paymentMethod && mismoMonto(a, b) && a.datePaid === b.datePaid;
 }
 
 async function leaseSondeoDisponible(ctx: ActionCtx, intentoId: Id<"intentos">, leaseId?: string): Promise<boolean> {
@@ -71,7 +85,7 @@ export const datosIntento = internalQuery({
     publicId: v.string(), tipo: v.union(v.literal("link"), v.literal("qr")), estado: v.string(),
     peyPayableId: v.union(v.string(), v.null()), destino: v.union(v.literal("cuenta_de_la_llave"), v.literal("bank_account_id")),
     cobroId: v.id("cobros"), cobroPublicId: v.string(), montoCentavos: v.number(), estadoCobro: estadoCobroValidator,
-    expiraEn: v.number(), modoNegocio: v.union(v.literal("demo"), v.literal("live")),
+    creadoEn: v.number(), expiraEn: v.number(), modoNegocio: v.union(v.literal("demo"), v.literal("live")),
   })),
   handler: async (ctx, args) => {
     const intento = await ctx.db.get(args.intentoId);
@@ -83,7 +97,7 @@ export const datosIntento = internalQuery({
       intentoId: intento._id, negocioId: negocio._id, modo: intento.modo, publicId: intento.publicId,
       tipo: intento.tipo, estado: intento.estado, peyPayableId: intento.peyPayableId ?? null,
       destino: intento.destino, cobroId: cobro._id, cobroPublicId: cobro.publicId,
-      montoCentavos: cobro.montoCentavos, estadoCobro: cobro.estado, expiraEn: cobro.expiraEn, modoNegocio: negocio.modo,
+      montoCentavos: cobro.montoCentavos, estadoCobro: cobro.estado, creadoEn: intento.creadoEn, expiraEn: cobro.expiraEn, modoNegocio: negocio.modo,
     };
   },
 });
@@ -113,10 +127,31 @@ export const registrarLectura = internalMutation({
   },
 });
 
+export const registrarDatoIlegible = internalMutation({
+  args: { intentoId: v.id("intentos") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const intento = await ctx.db.get(args.intentoId);
+    const cobro = intento ? await ctx.db.get(intento.cobroId) : null;
+    const negocio = intento ? await ctx.db.get(intento.negocioId) : null;
+    if (!intento || !cobro || !negocio || intento.negocioId !== cobro.negocioId || cobro.negocioId !== negocio._id || intento.modo !== cobro.modo || cobro.modo !== negocio.modo) {
+      throw new ConvexError({ codigo: "NO_ENCONTRADO", mensaje: "No se encontró el intento." });
+    }
+    const ultima = await ctx.db.query("bitacora").withIndex("by_cobro_seq", (q) => q.eq("cobroId", cobro._id)).order("desc").first();
+    if (ultima?.tipo === "pey.dato_ilegible") return null;
+    await registrar(ctx, {
+      negocioId: negocio._id, modo: negocio.modo, tipo: "pey.dato_ilegible", cobroId: cobro._id,
+      intentoId: intento._id, actor: { tipo: "pey" }, detalle: {},
+    });
+    return null;
+  },
+});
+
 export const aplicarEvidencia = internalMutation({
   args: {
     intentoId: v.id("intentos"), evidencia: v.object({
       transacciones: v.array(txValidator), link: v.optional(linkValidator), destinoConfirmado: v.optional(v.boolean()),
+      motivoCuenta: v.optional(v.literal("monto_distinto")),
     }), origen: origenValidator,
   },
   returns: v.object({ ok: v.boolean(), resultado: v.string() }),
@@ -128,13 +163,16 @@ export const aplicarEvidencia = internalMutation({
       throw new ConvexError({ codigo: "NO_ENCONTRADO", mensaje: "No se encontró el intento." });
     }
     if (!intento.peyPayableId) return { ok: true, resultado: "sin_pago" };
-    const evidencia = args.evidencia as Evidencia;
-    const veredicto = evaluar({
+    const evidencia = evidenciaSinRepeticiones(args.evidencia as Evidencia);
+    const evaluado = evaluar({
       tipo: intento.tipo, peyPayableId: intento.peyPayableId, intentoPublicId: intento.publicId,
       montoCentavos: intento.montoCentavos, destino: intento.destino,
     }, evidencia);
-    if (veredicto.resultado === "sin_pago") return { ok: true, resultado: "sin_pago" };
-    const pagadas = veredicto.transacciones;
+    if (evaluado.resultado === "sin_pago") return { ok: true, resultado: "sin_pago" };
+    const veredicto = args.evidencia.motivoCuenta && (evaluado.resultado === "coincide" || evaluado.motivo === "destino_distinto")
+      ? { resultado: "revisar" as const, motivo: args.evidencia.motivoCuenta, transacciones: evaluado.transacciones }
+      : evaluado;
+    const pagadas = [...new Map(veredicto.transacciones.map((tx) => [tx.transactionId, tx])).values()];
     const nuevas: TransaccionPey[] = [];
     for (const transaccion of pagadas) {
       const reclamo = await ctx.db.query("pagos").withIndex("by_peyTransactionId", (q) => q.eq("peyTransactionId", transaccion.transactionId)).unique();
@@ -149,7 +187,7 @@ export const aplicarEvidencia = internalMutation({
     const liberado = cobro.estado === "liberado" || cobro.liberadoEn !== undefined;
     let resultadoPago: ResultadoPago = veredicto.resultado === "coincide" ? "coincide" : veredicto.motivo;
     if (tardio) resultadoPago = "pago_tardio";
-    if (liberado) resultadoPago = "duplicado";
+    if (liberado || (cobro.estado === "en_revision" && veredicto.resultado === "coincide")) resultadoPago = "duplicado";
     const pagosInsertados: Id<"pagos">[] = [];
     let nuevasBaseCentavos = 0;
     for (const transaccion of nuevas) {
@@ -188,14 +226,16 @@ export const aplicarEvidencia = internalMutation({
       }
       return { ok: true, resultado: "duplicado" };
     }
-    if (cobro.estado === "en_revision" && veredicto.resultado === "revisar") {
+    if (cobro.estado === "en_revision") {
+      if (veredicto.resultado === "coincide") await ctx.db.patch(cobro._id, { alerta: "pago_duplicado", actualizadoEn: ahora });
       for (const pagoId of pagosInsertados) {
         await registrar(ctx, {
-          negocioId: negocio._id, modo: negocio.modo, tipo: "pago.no_coincide", cobroId: cobro._id,
-          intentoId: intento._id, pagoId, actor: { tipo: "pey" }, detalle: { motivo: veredicto.motivo }, en: ahora,
+          negocioId: negocio._id, modo: negocio.modo, tipo: veredicto.resultado === "revisar" ? "pago.no_coincide" : "pago.duplicado", cobroId: cobro._id,
+          intentoId: intento._id, pagoId, actor: { tipo: "pey" },
+          detalle: { motivo: veredicto.resultado === "revisar" ? veredicto.motivo : "duplicado" }, en: ahora,
         });
       }
-      return { ok: true, resultado: veredicto.motivo };
+      return { ok: true, resultado: veredicto.resultado === "revisar" ? veredicto.motivo : "duplicado" };
     }
     if (tardio) {
       const nuevoEstado = transicionarCobro(cobro.estado, "pago_tardio");
@@ -297,6 +337,7 @@ export const verificarIntento = internalAction({
       }
 
       let destinoConfirmado = false;
+      let motivoCuenta: "monto_distinto" | undefined;
       if (datos.tipo === "qr" && datos.destino === "bank_account_id") {
         const relevantes = transacciones.filter((tx) => tx.status === "PAID" && tx.currency === "MXN" && tx.payableType === "API_CODI_QR" && tx.payableId === datos.peyPayableId);
         if (relevantes.length > 0) {
@@ -304,16 +345,29 @@ export const verificarIntento = internalAction({
           let token: string | undefined;
           let listaCompleta = false;
           let pruebaInconclusa = false;
+          let datoIlegible = false;
           for (let paginaNumero = 0; paginaNumero < MAX_PAGINAS_CUENTA; paginaNumero += 1) {
             if (!(await leaseSondeoDisponible(ctx, args.intentoId, args.leaseId))) return { ok: false, resultado: "sondeo_deteniendo" };
             const pagina = await puerto.listarTransaccionesCuenta(token);
-            if (pagina.descartadas > 0) pruebaInconclusa = true;
+            if (pagina.idsDescartadas.some((id, index) => {
+              if (id !== null) return relevantes.some((tx) => tx.transactionId === id);
+              const dato = pagina.datosDescartadas?.[index];
+              const montoCompatible = dato?.baseCentavos == null || dato.baseCentavos === datos.montoCentavos;
+              const fechaCompatible = dato?.pagadoEn == null || (dato.pagadoEn >= datos.creadoEn && dato.pagadoEn <= datos.expiraEn);
+              return montoCompatible && fechaCompatible;
+            })) {
+              pruebaInconclusa = true;
+              datoIlegible = true;
+            }
             for (const row of pagina.transactions) {
               const objetivo = relevantes.find((tx) => tx.transactionId === row.transactionId);
               if (objetivo && mismaTransaccion(objetivo, row)) encontrados.add(row.transactionId);
-              else if (objetivo && idVistoSinConfirmar(objetivo, row)) pruebaInconclusa = true;
+              else if (objetivo) {
+                if (row.status === "PAID" && !mismoMonto(objetivo, row)) motivoCuenta = "monto_distinto";
+                else pruebaInconclusa = true;
+              }
             }
-            if (relevantes.every((tx) => encontrados.has(tx.transactionId))) {
+            if (!motivoCuenta && !pruebaInconclusa && relevantes.every((tx) => encontrados.has(tx.transactionId))) {
               listaCompleta = true;
               destinoConfirmado = true;
               break;
@@ -325,6 +379,7 @@ export const verificarIntento = internalAction({
             }
           }
           if (!destinoConfirmado && pruebaInconclusa) {
+            if (datoIlegible) await ctx.runMutation(internal.motor.verificar.registrarDatoIlegible, { intentoId: args.intentoId });
             await ctx.runMutation(internal.motor.verificar.registrarLectura, { intentoId: args.intentoId, exitosa: false });
             return { ok: false, resultado: "diferida" };
           }
@@ -334,10 +389,11 @@ export const verificarIntento = internalAction({
           }
         }
       }
-      const evidencia: Evidencia = {
+      const evidencia = {
         transacciones,
         ...(link ? { link } : {}),
         ...(datos.tipo === "qr" ? { destinoConfirmado } : {}),
+        ...(motivoCuenta ? { motivoCuenta } : {}),
       };
       const resultado = await ctx.runMutation(internal.motor.verificar.aplicarEvidencia, { intentoId: args.intentoId, evidencia, origen: args.origen });
       await ctx.runMutation(internal.motor.verificar.registrarLectura, { intentoId: args.intentoId, exitosa: true });

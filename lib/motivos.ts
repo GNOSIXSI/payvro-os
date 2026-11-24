@@ -8,6 +8,10 @@ export const TEXTO_MOTIVO = {
   parcial: "El pago no cubre el monto completo.",
 } as const;
 
+export function textoDeEvento(tipo: string): string | null {
+  return tipo === "pey.dato_ilegible" ? "Pey devolvió un dato ilegible" : null;
+}
+
 export type MotivoRevision = keyof typeof TEXTO_MOTIVO;
 
 export function textoDeMotivo(motivo: string | undefined): string | null {

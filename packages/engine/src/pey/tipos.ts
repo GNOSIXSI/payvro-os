@@ -37,8 +37,12 @@ export interface PaginaReferenciasTransacciones {
 export interface PaginaTransacciones {
   transactions: TransaccionPey[];
   nextToken: string | null;
-  /** Rows skipped because the payable shape was not recognized. Zero means every row was readable. */
+  /** Rows skipped because the payable or transaction id was not recognized. */
   descartadas: number;
+  /** Readable ids of skipped rows; null means the id could not be safely read. */
+  idsDescartadas: (string | null)[];
+  /** Sanitized candidate fields, aligned with idsDescartadas; absent metadata remains unknown. */
+  datosDescartadas?: Array<{ baseCentavos: number | null; pagadoEn: number | null }>;
 }
 
 export interface TransaccionPeyWire {
