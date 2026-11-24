@@ -2,6 +2,8 @@ import { expect, test, type Page, type WebSocketRoute } from "@playwright/test";
 import { formatoMXN } from "../lib/formato";
 
 const CREADO_EN = new Date("2026-11-15T18:00:00.000Z").getTime();
+const DIA_MS = 24 * 60 * 60 * 1000;
+const AHORA_POR_DEFECTO = CREADO_EN + 2 * DIA_MS;
 const MONTO_MESA = 14_900;
 const MONTO_FILA = 100;
 
@@ -117,6 +119,40 @@ test.describe("Inicio montado", () => {
   });
 });
 
+test.describe("Gráfica en el borde del calendario de la ciudad de México", () => {
+  test.describe.configure({ timeout: 60_000 });
+  // The browser zone is far from the chart zone, so the host zone cannot decide the result.
+  test.use({ timezoneId: "Asia/Tokyo" });
+
+  test("cuenta solo los siete días de calendario que terminan hoy en la ciudad de México", async ({ page }) => {
+    // 2026-11-21T03:30Z is 2026-11-20 21:30 in Mexico City: UTC and local dates differ.
+    const ahora = Date.parse("2026-11-21T03:30:00.000Z");
+    const frontera = crearFrontera(resumen(0), {
+      "": paginaDe(
+        [
+          // Oldest included day, 14 Nov 01:00 local (07:00Z, still 14 Nov in UTC too).
+          filaEn(1, 111, Date.parse("2026-11-14T07:00:00.000Z")),
+          // Just outside: 13 Nov 23:59:59 local, which is already 14 Nov in UTC.
+          filaEn(2, 222, Date.parse("2026-11-14T05:59:59.000Z")),
+          // Newest included day: 20 Nov 20:00 local, which is 21 Nov in UTC.
+          filaEn(3, 333, Date.parse("2026-11-21T02:00:00.000Z")),
+          // Just outside: 21 Nov 00:00 local, tomorrow.
+          filaEn(4, 444, Date.parse("2026-11-21T06:00:00.000Z")),
+        ],
+        true,
+        "4",
+      ),
+    });
+    await abrir(page, frontera, ahora);
+
+    await expect(grafica(page)).toContainText(textoTotal(111 + 333));
+    await expect(dia(page, "14 nov")).toContainText(formatoMXN(111));
+    await expect(dia(page, "20 nov")).toContainText(formatoMXN(333));
+    await expect(grafica(page).getByText("13 nov")).toHaveCount(0);
+    await expect(grafica(page).getByText("21 nov")).toHaveCount(0);
+  });
+});
+
 function crearFrontera(inicial: Resumen, paginas: Record<string, PaginaLista>): Frontera {
   return {
     consultas: new Map(),
@@ -127,7 +163,7 @@ function crearFrontera(inicial: Resumen, paginas: Record<string, PaginaLista>): 
   };
 }
 
-async function abrir(page: Page, frontera: Frontera): Promise<void> {
+async function abrir(page: Page, frontera: Frontera, ahora: number = AHORA_POR_DEFECTO): Promise<void> {
   const fallos: string[] = [];
   page.on("pageerror", (error) => {
     fallos.push(error.message);
@@ -137,6 +173,7 @@ async function abrir(page: Page, frontera: Frontera): Promise<void> {
       fallos.push(mensaje.text());
     }
   });
+  await page.clock.install({ time: ahora });
   await enganchar(page, frontera);
   await page.goto("/panel");
   try {
@@ -338,6 +375,10 @@ function grafica(page: Page) {
   return page.getByRole("region", { name: "Cobros liberados por día de creación" });
 }
 
+function dia(page: Page, etiqueta: string) {
+  return grafica(page).getByRole("listitem").filter({ hasText: etiqueta });
+}
+
 function textoTotal(centavos: number): string {
   return `Suma por día de creación: ${formatoMXN(centavos)}`;
 }
@@ -355,6 +396,10 @@ function fila(folio: number, concepto: string, estado: string, montoCentavos: nu
     estado,
     creadoEn: CREADO_EN,
   };
+}
+
+function filaEn(folio: number, montoCentavos: number, creadoEn: number): Fila {
+  return { ...fila(folio, `Fila ${folio}`, "liberado", montoCentavos), creadoEn };
 }
 
 function paginaDe(page: Fila[], isDone: boolean, continueCursor: string): PaginaLista {
