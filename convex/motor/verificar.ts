@@ -226,7 +226,8 @@ export const aplicarEvidencia = internalMutation({
     if (nuevas.length === 0) return { ok: true, resultado: "repetido" };
     const ahora = Date.now();
     const evidenciaIlegibleSinPago = cobro.estado === "en_revision" && cobro.pagoId === undefined && cobro.motivoRevision === "evidencia_ilegible";
-    const tardio = cobro.estado === "expirado" || cobro.estado === "cancelado" || (evidenciaIlegibleSinPago && cobro.expiraEn <= ahora);
+    const tardio = cobro.estado === "expirado" || cobro.estado === "cancelado" ||
+      (evidenciaIlegibleSinPago && (cobro.expiraEn <= ahora || cobro.claveCancelacion !== undefined));
     const liberado = cobro.estado === "liberado" || cobro.estado === "pagado_verificado" || cobro.liberadoEn !== undefined;
     let resultadoPago: ResultadoPago = veredicto.resultado === "coincide" ? "coincide" : veredicto.motivo;
     if (tardio) resultadoPago = "pago_tardio";

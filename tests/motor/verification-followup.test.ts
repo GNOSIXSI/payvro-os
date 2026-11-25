@@ -26,9 +26,13 @@ async function escenario() {
     throw new Error("Unexpected synthetic request");
   }));
   const poll = (observacionId?: string) => t.action(internal.motor.verificar.verificarIntento, { intentoId: ids.intentoId, origen: "sondeo", ...(observacionId ? { observacionId } : {}) });
+  const cancel = () => t.withIdentity({ email: "owner@example.invalid", emailVerified: true }).mutation(api.cobros.cancelar, {
+    publicId: ids.cobroPublicId, claveIdempotencia: "cancel-test-key-0001",
+  });
+  const sweep = () => t.action(internal.motor.barrido.recuperar, {});
   const detail = () => t.withIdentity({ email: "owner@example.invalid", emailVerified: true }).query(api.cobros.obtener, { publicId: ids.cobroPublicId });
   const log = () => t.run((ctx) => ctx.db.query("bitacora").withIndex("by_cobro_seq", (q) => q.eq("cobroId", ids.cobroId)).collect());
-  return { t, negocioId, ...ids, poll, detail, log, setAccount: (rows: unknown[]) => { account = rows; }, setPaid: (value: boolean) => { paid = value; } };
+  return { t, negocioId, ...ids, poll, cancel, sweep, detail, log, setAccount: (rows: unknown[]) => { account = rows; }, setPaid: (value: boolean) => { paid = value; } };
 }
 
 it("escalates at three distinct unreadable checks, not two, and alerts only once at four", async () => {
@@ -95,6 +99,40 @@ it("records the first readable payment after expired unreadable evidence as late
   expect((await s.t.run((ctx) => ctx.db.get(s.cobroId)))?.pagoId).toBeDefined();
   expect(detail).not.toHaveProperty("alerta");
   expect(await s.t.run((ctx) => ctx.db.query("pagos").withIndex("by_cobro", (q) => q.eq("cobroId", s.cobroId)).collect())).toHaveLength(1);
+});
+
+it("records a matching payment after cancelled unreadable evidence as late through the real sweep", async () => {
+  const s = await escenario();
+  await expect(s.cancel()).resolves.toEqual({ estado: "cancelado" });
+  const cancelado = await s.t.run((ctx) => ctx.db.get(s.intentoId));
+  expect(cancelado).toMatchObject({ estado: "descartado", barridoActivo: true });
+  expect(cancelado?.siguienteBarridoEn).toBeLessThanOrEqual(Date.now());
+  expect((await s.t.run((ctx) => ctx.db.get(s.cobroId)))?.claveCancelacion).toBeDefined();
+
+  s.setAccount([{ id: TX_ID, payableType: "UNRECOGNIZED" }]);
+  for (let n = 0; n < 3; n++) {
+    if (n > 0) await s.t.run((ctx) => ctx.db.patch(s.intentoId, { siguienteBarridoEn: Date.now() - 1 }));
+    await expect(s.sweep(), `unreadable sweep ${n + 1}`).resolves.toEqual({ revisados: 1 });
+  }
+  expect(await s.detail()).toMatchObject({ estado: "en_revision" });
+  expect((await s.t.run((ctx) => ctx.db.get(s.cobroId)))?.motivoRevision).toBe("evidencia_ilegible");
+  expect((await s.t.run((ctx) => ctx.db.get(s.cobroId)))?.pagoId).toBeUndefined();
+
+  s.setAccount([transaccionWire(TX_ID)]);
+  await s.t.run((ctx) => ctx.db.patch(s.intentoId, { siguienteBarridoEn: Date.now() - 1 }));
+  await expect(s.sweep()).resolves.toEqual({ revisados: 1 });
+
+  const detail = await s.detail();
+  expect(detail).toMatchObject({ estado: "en_revision", pago: { resultado: "pago_tardio", baseCentavos: 1 } });
+  expect(detail).not.toHaveProperty("alerta");
+  const cobro = await s.t.run((ctx) => ctx.db.get(s.cobroId));
+  expect(cobro?.pagoId).toBeDefined();
+  expect(cobro?.motivoRevision).toBe("pago_tardio");
+  expect(await s.t.run((ctx) => ctx.db.query("pagos").withIndex("by_cobro", (q) => q.eq("cobroId", s.cobroId)).collect())).toHaveLength(1);
+  const log = await s.log();
+  expect(log.filter((row) => row.tipo === "pago.duplicado")).toHaveLength(0);
+  expect(log.filter((row) => row.tipo === "pago.verificado")).toHaveLength(0);
+  expect(log.filter((row) => row.tipo === "cobro.liberado")).toHaveLength(0);
 });
 
 it("keeps the normal verdict when unreadable evidence escalates before expiry", async () => {
