@@ -74,6 +74,45 @@ it.each(["before", "during", "after"])("expiry %s escalation never leaves unreso
   expect((await s.detail())?.pago).toBeNull();
 });
 
+it("records the first readable payment after expired unreadable evidence as late, not duplicate", async () => {
+  const s = await escenario();
+  s.setAccount([{ id: TX_ID, payableType: "UNRECOGNIZED" }]);
+  await s.t.run((ctx) => ctx.db.patch(s.cobroId, { expiraEn: Date.now() - 1 }));
+  await s.t.mutation(internal.motor.cobros.expirarVencidos, {});
+  expect((await s.detail())?.estado).toBe("expirado");
+  expect((await s.t.run((ctx) => ctx.db.get(s.intentoId)))?.estado).toBe("descartado");
+
+  await s.poll();
+  const escalado = await s.t.run((ctx) => ctx.db.get(s.cobroId));
+  expect(escalado).toMatchObject({ estado: "en_revision", motivoRevision: "evidencia_ilegible" });
+  expect(escalado?.pagoId).toBeUndefined();
+  expect(await s.detail()).toMatchObject({ estado: "en_revision", pago: null });
+
+  s.setAccount([transaccionWire(TX_ID)]);
+  await s.poll();
+  const detail = await s.detail();
+  expect(detail).toMatchObject({ estado: "en_revision", pago: { resultado: "pago_tardio", baseCentavos: 1 } });
+  expect((await s.t.run((ctx) => ctx.db.get(s.cobroId)))?.pagoId).toBeDefined();
+  expect(detail).not.toHaveProperty("alerta");
+  expect(await s.t.run((ctx) => ctx.db.query("pagos").withIndex("by_cobro", (q) => q.eq("cobroId", s.cobroId)).collect())).toHaveLength(1);
+});
+
+it("keeps the normal verdict when unreadable evidence escalates before expiry", async () => {
+  const s = await escenario();
+  await s.poll(); await s.poll(); await s.poll();
+  const escalado = await s.t.run((ctx) => ctx.db.get(s.cobroId));
+  expect(escalado).toMatchObject({ estado: "en_revision", motivoRevision: "evidencia_ilegible" });
+  expect(escalado?.pagoId).toBeUndefined();
+
+  s.setAccount([transaccionWire(TX_ID)]);
+  await s.poll();
+  const detail = await s.detail();
+  expect(detail).toMatchObject({ estado: "en_revision", pago: { resultado: "coincide", baseCentavos: 1 } });
+  expect((await s.t.run((ctx) => ctx.db.get(s.cobroId)))?.pagoId).toBeDefined();
+  expect(detail).not.toHaveProperty("alerta");
+  expect((await s.log()).filter((row) => row.tipo === "cobro.liberado")).toHaveLength(0);
+});
+
 it("still expires ordinary unpaid charges and never regresses a released charge", async () => {
   const s = await escenario();
   s.setPaid(false); await s.poll();

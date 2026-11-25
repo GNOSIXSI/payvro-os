@@ -225,11 +225,12 @@ export const aplicarEvidencia = internalMutation({
     }
     if (nuevas.length === 0) return { ok: true, resultado: "repetido" };
     const ahora = Date.now();
-    const tardio = cobro.estado === "expirado" || cobro.estado === "cancelado";
+    const evidenciaIlegibleSinPago = cobro.estado === "en_revision" && cobro.pagoId === undefined && cobro.motivoRevision === "evidencia_ilegible";
+    const tardio = cobro.estado === "expirado" || cobro.estado === "cancelado" || (evidenciaIlegibleSinPago && cobro.expiraEn <= ahora);
     const liberado = cobro.estado === "liberado" || cobro.estado === "pagado_verificado" || cobro.liberadoEn !== undefined;
     let resultadoPago: ResultadoPago = veredicto.resultado === "coincide" ? "coincide" : veredicto.motivo;
     if (tardio) resultadoPago = "pago_tardio";
-    if (liberado || (cobro.estado === "en_revision" && veredicto.resultado === "coincide")) resultadoPago = "duplicado";
+    if (liberado || (cobro.estado === "en_revision" && veredicto.resultado === "coincide" && !evidenciaIlegibleSinPago)) resultadoPago = "duplicado";
     if (resultadoPago === "duplicado") await ctx.db.patch(cobro._id, { alerta: "pago_duplicado", actualizadoEn: ahora });
     const pagosInsertados: Id<"pagos">[] = [];
     let nuevasBaseCentavos = 0;
@@ -270,15 +271,21 @@ export const aplicarEvidencia = internalMutation({
       return { ok: true, resultado: "duplicado" };
     }
     if (cobro.estado === "en_revision") {
-      if (veredicto.resultado === "coincide") await ctx.db.patch(cobro._id, { alerta: "pago_duplicado", actualizadoEn: ahora });
-      for (const pagoId of pagosInsertados) {
-        await registrar(ctx, {
-          negocioId: negocio._id, modo: negocio.modo, tipo: resultadoPago === "duplicado" ? "pago.duplicado" : "pago.no_coincide", cobroId: cobro._id,
-          intentoId: intento._id, pagoId, actor: { tipo: "pey" },
-          detalle: { motivo: veredicto.resultado === "revisar" ? veredicto.motivo : "duplicado" }, en: ahora,
+      if (evidenciaIlegibleSinPago) {
+        await ctx.db.patch(cobro._id, {
+          pagoId: pagosInsertados[0], verificadoEn: ahora, actualizadoEn: ahora,
+          ...(tardio ? { motivoRevision: "pago_tardio" } : {}),
         });
       }
-      return { ok: true, resultado: veredicto.resultado === "revisar" ? veredicto.motivo : "duplicado" };
+      for (const pagoId of pagosInsertados) {
+        const tipo = resultadoPago === "duplicado" ? "pago.duplicado" : resultadoPago === "coincide" ? "pago.verificado" : "pago.no_coincide";
+        await registrar(ctx, {
+          negocioId: negocio._id, modo: negocio.modo, tipo, cobroId: cobro._id,
+          intentoId: intento._id, pagoId, actor: { tipo: "pey" },
+          detalle: resultadoPago === "coincide" ? {} : { motivo: resultadoPago }, en: ahora,
+        });
+      }
+      return { ok: true, resultado: resultadoPago };
     }
     if (tardio) {
       const nuevoEstado = transicionarCobro(cobro.estado, "pago_tardio");
