@@ -12,7 +12,7 @@ const tipos = new Set([
 ]);
 const motivos = new Set([
   "monto_distinto", "destino_distinto", "metodo_no_permitido", "con_propina",
-  "duplicado", "pago_tardio", "parcial", "incierto_60s", "cobro_cancelado", "cobro_expirado",
+  "duplicado", "pago_tardio", "parcial", "incierto_60s", "cobro_cancelado", "cobro_expirado", "evidencia_ilegible",
 ]);
 const keysPorTipo: Record<string, readonly string[]> = {
   "cobro.creado": ["folio", "montoCentavos"],
@@ -108,7 +108,7 @@ export async function registrar(ctx: MutationCtx, entrada: EntradaBitacora): Pro
     detalle: entrada.detalle as {
       folio?: number; montoCentavos?: number; tipo?: "qr" | "link";
       operacion?: "crear_qr" | "crear_link"; causa?: "timeout" | "red" | "5xx"; httpStatus?: number;
-      motivo?: "monto_distinto" | "destino_distinto" | "metodo_no_permitido" | "con_propina" | "duplicado" | "pago_tardio" | "parcial" | "incierto_60s" | "cobro_cancelado" | "cobro_expirado";
+      motivo?: "monto_distinto" | "destino_distinto" | "metodo_no_permitido" | "con_propina" | "duplicado" | "pago_tardio" | "parcial" | "incierto_60s" | "cobro_cancelado" | "cobro_expirado" | "evidencia_ilegible";
       origen?: "simulador"; pausados?: boolean;
     },
     en: entrada.en ?? Date.now(),

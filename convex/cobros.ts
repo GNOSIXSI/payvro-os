@@ -82,7 +82,7 @@ export const obtener = query({
         publicId: intentoValido.publicId, tipo: intentoValido.tipo, estado: intentoValido.estado, montoCentavos: intentoValido.montoCentavos,
         ...(intentoValido.qrString ? { qrString: intentoValido.qrString } : {}), ...(intentoValido.urlPago ? { urlPago: intentoValido.urlPago } : {}),
       } : null,
-      pago: pagos ? {
+      pago: pagos && pagos.negocioId === negocioId && pagos.cobroId === cobro._id && pagos.modo === modo ? {
         publicId: pagos.publicId, resultado: pagos.resultado, metodo: pagos.metodo,
         baseCentavos: pagos.baseCentavos, totalCentavos: pagos.totalCentavos, pagadoEn: pagos.pagadoEn,
       } : null,
