@@ -37,13 +37,9 @@ export const cobro = query({
     const cobro = await ctx.db.query("cobros").withIndex("by_publicId", (q) => q.eq("publicId", args.publicId)).unique();
     if (!cobro) return null;
     const instalacionModo = modo();
-    if (cobro.modo !== instalacionModo) {
-      throw new ConvexError({ codigo: "MODO_INVALIDO", mensaje: "El modo del negocio no coincide con la instalación." });
-    }
+    if (cobro.modo !== instalacionModo) return null;
     const negocio = await ctx.db.get(cobro.negocioId);
-    if (!negocio || negocio.modo !== cobro.modo) {
-      throw new ConvexError({ codigo: "MODO_INVALIDO", mensaje: "El modo del negocio no coincide con la instalación." });
-    }
+    if (!negocio || negocio.modo !== cobro.modo) return null;
     const intentoGuardado = cobro.intentoActivoId ? await ctx.db.get(cobro.intentoActivoId) : null;
     const intento = intentoGuardado && intentoGuardado.negocioId === cobro.negocioId && intentoGuardado.cobroId === cobro._id && intentoGuardado.modo === cobro.modo ? intentoGuardado : null;
     return {
@@ -70,6 +66,7 @@ export const vigilar = mutation({
     const intento = await ctx.db.get(cobro.intentoActivoId);
     if (!negocio || !intento || intento.negocioId !== negocio._id || intento.cobroId !== cobro._id || negocio.modo !== cobro.modo) return { ok: false };
     await consumirLimite(ctx, `vigilar:${cobro.publicId}`, 60);
+    await consumirLimite(ctx, "vigilar:instalacion", 600);
     const ahora = Date.now();
     const vigiladoHasta = ahora + 30_000;
     if (negocio.modo !== "live" || intento.tipo !== "qr" || intento.estado !== "creado") {
