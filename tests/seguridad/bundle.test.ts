@@ -25,7 +25,7 @@ case "$*" in
   'run bundle:revisar') exec node scripts/revisar-bundle.mjs ;;
   'run audit') exec node scripts/revisar-bundle.mjs --audit ;;
   'audit --omit=dev --audit-level=high --json') cat audit-fixture.json; exit "$AUDIT_STATUS" ;;
-  'run build') printf '%s\\n' 'build-fixture-marker' "\${LOG_FIXTURE:-output normal}"; exit "\${BUILD_STATUS:-0}" ;;
+  'run build') rm -f .next/static/chunks/e2e.js; printf '%s\\n' 'build-fixture-marker' "\${LOG_FIXTURE:-output normal}"; exit "\${BUILD_STATUS:-0}" ;;
   'run secrets') echo 'secrets-fixture-ran' ;;
   'run e2e')
     if [[ -n "\${E2E_BUNDLE_FIXTURE:-}" ]]; then
