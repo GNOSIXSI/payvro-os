@@ -12,6 +12,7 @@ import type * as cobros from "../cobros.js";
 import type * as crons from "../crons.js";
 import type * as demo from "../demo.js";
 import type * as diagnostico from "../diagnostico.js";
+import type * as instalacion from "../instalacion.js";
 import type * as motor_barrido from "../motor/barrido.js";
 import type * as motor_bitacora from "../motor/bitacora.js";
 import type * as motor_cobros from "../motor/cobros.js";
@@ -40,6 +41,7 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   demo: typeof demo;
   diagnostico: typeof diagnostico;
+  instalacion: typeof instalacion;
   "motor/barrido": typeof motor_barrido;
   "motor/bitacora": typeof motor_bitacora;
   "motor/cobros": typeof motor_cobros;
