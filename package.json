@@ -21,6 +21,8 @@
     "secrets": "gitleaks dir . --redact --no-banner && gitleaks git . --log-opts=--all --redact --no-banner",
     "doctor": "node scripts/doctor.mjs",
     "smoke:demo": "node scripts/smoke-demo.mjs",
+    "audit": "node scripts/revisar-bundle.mjs --audit",
+    "bundle:revisar": "node scripts/revisar-bundle.mjs",
     "gate": "bash scripts/gate.sh"
   },
   "dependencies": {

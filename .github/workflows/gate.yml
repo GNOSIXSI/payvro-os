@@ -54,4 +54,6 @@ jobs:
         run: npx playwright install-deps chromium
 
       - name: Gate
+        env:
+          PAYVRO_SENTINEL: "payvro-ci-canary-not-a-credential"
         run: npm run gate
