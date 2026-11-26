@@ -4,6 +4,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
+# Both builds and their checks inherit one synthetic canary. Tests can supply their own.
+export PAYVRO_SENTINEL="${PAYVRO_SENTINEL:-payvro-ci-canary-not-a-credential}"
+
 log="$(mktemp)"
 trap 'rm -f -- "$log"' EXIT
 
