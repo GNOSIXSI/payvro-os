@@ -23,6 +23,8 @@ paso npm run audit
 paso npm run build
 paso npm run bundle:revisar
 paso npm run e2e
+# E2E builds Next again with its isolated backend URL.
+paso npm run bundle:revisar
 # Next.js build output (.next/) and the local Convex backend state (.convex/, written by
 # `convex codegen` with an ephemeral admin key) are gitignored, but gitleaks dir scans
 # them and flags generated values. This env config replaces .gitleaks.toml for the dir scan.

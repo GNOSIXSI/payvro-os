@@ -27,7 +27,11 @@ case "$*" in
   'audit --omit=dev --audit-level=high --json') cat audit-fixture.json; exit "$AUDIT_STATUS" ;;
   'run build') printf '%s\\n' 'build-fixture-marker' "\${LOG_FIXTURE:-output normal}"; exit "\${BUILD_STATUS:-0}" ;;
   'run secrets') echo 'secrets-fixture-ran' ;;
-  'run typecheck'|'run lint'|'test'|'run e2e') : ;;
+  'run e2e')
+    if [[ -n "\${E2E_BUNDLE_FIXTURE:-}" ]]; then
+      printf '%s\\n' "$E2E_BUNDLE_FIXTURE" > .next/static/chunks/e2e.js
+    fi ;;
+  'run typecheck'|'run lint'|'test') : ;;
   *) exit 99 ;;
 esac
 `, { mode: 0o700 });
@@ -75,6 +79,11 @@ it.each([canario, "PEY_API_KEY", "PEY_WEBHOOK_SECRET", "CLERK_SECRET_KEY", "CONV
   const limpio = gate();
   expect(limpio.exit).toBe(0);
   expect(limpio.output).toContain("secrets-fixture-ran");
+});
+
+it("revisa también el bundle producido durante E2E", () => {
+  expect(gate("none", { E2E_BUNDLE_FIXTURE: canario })).toMatchObject({ exit: 1, output: expect.stringContaining("Marcador prohibido en el bundle") });
+  expect(gate("none", { E2E_BUNDLE_FIXTURE: "normal" })).toMatchObject({ exit: 0, output: expect.stringContaining("secrets-fixture-ran") });
 });
 
 it("no publica logs con el canario, incluso si el comando falla; limpia la salida y preserva su exit", () => {
