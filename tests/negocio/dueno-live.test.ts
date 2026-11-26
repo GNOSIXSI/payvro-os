@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { convexTest } from "convex-test";
 import { makeFunctionReference } from "convex/server";
-import { api } from "../../convex/_generated/api";
+import { api, internal } from "../../convex/_generated/api";
 import schema from "../../convex/schema";
 import * as cobros from "../../convex/cobros";
 import * as negocio from "../../convex/negocio";
@@ -23,20 +23,40 @@ beforeEach(() => {
   vi.stubEnv("PEY_API_KEY", undefined);
   vi.stubEnv("PEY_BANK_ACCOUNT_ID", undefined);
 });
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
+});
 
 describe("alta administrativa", () => {
-  it("crea un negocio LIVE, no lo reemplaza y no deja reservar sin cuenta lista", async () => {
+  it("instala una sola vez y exige comprobar la cuenta LIVE antes de reservar, incluso con configuración pey", async () => {
+    vi.stubEnv("PEY_API_KEY", "pey-fixture-no-network");
+    vi.stubEnv("PEY_BANK_ACCOUNT_ID", "cuenta-ficticia");
+    const fetcher = vi.fn(async () => { throw new Error("Esta prueba no contacta a pey"); });
+    vi.stubGlobal("fetch", fetcher);
+    // Observe reservations before the scheduled provider action can run, even under a mutant.
+    vi.useFakeTimers();
     const t = harness();
     expect(await t.mutation(instalar, perfil)).toEqual({ creado: true });
-    expect(await t.mutation(instalar, { ...perfil, nombre: "Otro perfil de ejemplo" })).toEqual({ creado: false });
-    expect(await t.run((ctx) => ctx.db.query("negocios").take(2))).toEqual([
-      expect.objectContaining({ ...perfil, modo: "live", folioSiguiente: 1, seqBitacora: 0 }),
-    ]);
     const dueno = autorizado(t);
     await expect(dueno.query(api.negocio.obtener, {})).resolves.toMatchObject({ ...perfil, cuentaLista: false });
     await expect(dueno.mutation(api.cobros.crear, crear)).rejects.toMatchObject({ data: { codigo: "CUENTA_NO_ACTIVA" } });
     expect(await t.run(async (ctx) => [await ctx.db.query("cobros").first(), await ctx.db.query("intentos").first()])).toEqual([null, null]);
+
+    const instalado = await t.run((ctx) => ctx.db.query("negocios").withIndex("by_modo", (q) => q.eq("modo", "live")).unique());
+    if (!instalado) throw new Error("Falta el negocio instalado");
+    await t.mutation(internal.motor.cuenta.guardarEstado, { negocioId: instalado._id, estado: "ACTIVE" });
+    expect(await t.mutation(instalar, { ...perfil, nombre: "Otro perfil de ejemplo" })).toEqual({ creado: false });
+    expect(await t.run((ctx) => ctx.db.query("negocios").take(2))).toEqual([
+      expect.objectContaining({ _id: instalado._id, ...perfil, modo: "live", folioSiguiente: 1, seqBitacora: 0 }),
+    ]);
+    const primerCobro = await dueno.mutation(api.cobros.crear, crear);
+    expect(primerCobro).toMatchObject({ folio: 1, estado: "borrador" });
+    await expect(dueno.query(api.cobros.obtener, { publicId: primerCobro.publicId })).resolves.toMatchObject({
+      estado: "borrador", intentoActivo: { estado: "reservado", tipo: "qr" },
+    });
+    expect(fetcher).not.toHaveBeenCalled();
   });
 
   it("es una mutación interna, no acepta destino y rechaza nombres inválidos", async () => {
