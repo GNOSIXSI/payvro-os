@@ -1,6 +1,6 @@
 "use client";
 
-import { ClerkProvider, useAuth } from "@clerk/react";
+import { ClerkProvider, useAuth } from "@clerk/nextjs";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
 import type { ReactNode } from "react";
@@ -17,13 +17,7 @@ export function Providers({ children }: Props) {
 
 export function ProveedorClerk({ children }: Props) {
   return (
-    <ClerkProvider
-      publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
-      signInUrl="/entrar"
-      afterSignOutUrl="/entrar"
-      signUpUrl="/entrar"
-      localization={{ locale: "es-MX" }}
-    >
+    <ClerkProvider signInUrl="/entrar" afterSignOutUrl="/entrar" signUpUrl="/entrar" localization={{ locale: "es-MX" }}>
       {children}
     </ClerkProvider>
   );
