@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Browser } from "@playwright/test";
 import { spawn } from "node:child_process";
 import { generateKeyPairSync, sign } from "node:crypto";
 import { cp, glob, mkdtemp, rm, symlink } from "node:fs/promises";
@@ -19,6 +19,52 @@ const identidades = new Map([
   ["ajeno", { email: "visitante@example.invalid", emailVerified: true }],
   ["no-verificado", { email: correo, emailVerified: false }],
 ]);
+
+async function probarHidratacion(browser: Browser, baseURL: string) {
+  const context = await browser.newContext({ baseURL, javaScriptEnabled: true });
+  try {
+    // Use the real, pinned browser SDK. Only the tenant's API is simulated.
+    await context.route("**/*", async (route) => {
+      const { origin, pathname } = new URL(route.request().url());
+      if (origin === baseURL) return route.continue();
+      if (origin !== issuer) return route.abort();
+      const headers = { "access-control-allow-origin": baseURL, "access-control-allow-credentials": "true" };
+      const asset = pathname.match(/^\/npm\/@clerk\/(clerk-js|ui)@[^/]+\/dist\/([\w.-]+\.js)$/);
+      if (asset) {
+        const version = asset[1] === "clerk-js" ? "6.43.1" : "1.42.6";
+        const archivo = await fetch(`https://cdn.jsdelivr.net/npm/@clerk/${asset[1]}@${version}/dist/${asset[2]}`, {
+          signal: AbortSignal.timeout(15_000),
+        });
+        if (!archivo.ok) throw new Error(`Clerk browser asset: ${asset[2]} (${archivo.status})`);
+        return route.fulfill({ headers, contentType: "text/javascript", body: Buffer.from(await archivo.arrayBuffer()) });
+      }
+      if (pathname === "/v1/environment") {
+        return route.fulfill({ headers, json: {
+          object: "environment",
+          auth_config: { single_session_mode: true },
+          display_config: { application_name: "PAYVRO Ejemplo", instance_environment_type: "production", branded: false },
+          user_settings: { attributes: {
+            email_address: { enabled: true, required: true, used_for_first_factor: true, first_factors: ["email_code"], verifications: ["email_code"] },
+          } },
+        } });
+      }
+      if (pathname === "/v1/client") {
+        return route.fulfill({ headers, json: { response: { object: "client", id: "client_fixture", sessions: [] } } });
+      }
+      return route.abort();
+    });
+    const page = await context.newPage();
+    await page.goto("/panel/nuevo");
+    await expect(page).toHaveURL(/\/entrar(?:\?|$)/);
+    const campoCorreo = page.getByRole("textbox", { name: /email address|correo electrónico/i });
+    await expect(campoCorreo).toBeEditable({ timeout: 30_000 });
+    await campoCorreo.fill("visitante@example.invalid");
+    await expect(campoCorreo).toHaveValue("visitante@example.invalid");
+    await expect(page.getByRole("button", { name: "Crear cobro" })).toHaveCount(0);
+  } finally {
+    await context.close();
+  }
+}
 
 test("la sesión Clerk abre el panel solo si Convex autoriza al dueño; el pagador no inicia sesión", async ({ browser }) => {
   test.setTimeout(120_000);
@@ -109,6 +155,7 @@ test("la sesión Clerk abre el panel solo si Convex autoriza al dueño; el pagad
       next!.once("exit", (code) => fail(new Error(`Next terminó antes de servir (exit=${code})`)));
       next!.stderr!.on("data", (data) => { errores = (errores + String(data)).slice(-4000); });
     });
+    await test.step("Clerk hidrata el formulario en /entrar después de la redirección, con JavaScript", () => probarHidratacion(browser, baseURL));
     const context = await browser.newContext({ baseURL, javaScriptEnabled: false });
     try {
       await context.route("**/*", (route) => route.request().url().startsWith(`${baseURL}/`) ? route.continue() : route.abort());
