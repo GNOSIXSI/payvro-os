@@ -1,8 +1,16 @@
 import { paginationOptsValidator, paginationResultValidator } from "convex/server";
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, type MutationCtx } from "./_generated/server";
 import { peyConfiguracionDisponible, resolverNegocio, resolverNegocioEscritura } from "./puertos";
 import { cancelarCobro, crearCobro, reintentarCobro } from "./motor/cobros";
+import { consumirLimite } from "./motor/limites";
+
+function limitarReserva(ctx: MutationCtx, { modo, negocioId, actor }: Awaited<ReturnType<typeof resolverNegocioEscritura>>) {
+  // DEMO is anonymous; preserve its existing per-business budget. LIVE has
+  // one configured issuer, and the resolver supplies the verified subject.
+  const clave = modo === "demo" ? `crear:${negocioId}` : `crear:dueno:${negocioId}:${actor.id}`;
+  return consumirLimite(ctx, clave, 10);
+}
 
 const estadoCobro = v.union(
   v.literal("borrador"), v.literal("esperando_pago"), v.literal("pagado_verificado"), v.literal("liberado"),
@@ -43,7 +51,7 @@ export const crear = mutation({
   handler: async (ctx, args) => {
     const resolucion = await resolverNegocioEscritura(ctx);
     const peyConfigPresente = resolucion.modo === "live" ? peyConfiguracionDisponible() : true;
-    return await crearCobro(ctx, args, resolucion.negocioId, resolucion.modo, resolucion.actor, peyConfigPresente);
+    return await crearCobro(ctx, args, resolucion.negocioId, resolucion.modo, resolucion.actor, peyConfigPresente, () => limitarReserva(ctx, resolucion));
   },
 });
 
@@ -112,6 +120,7 @@ export const cancelar = mutation({
   returns: v.object({ estado: estadoCobro }),
   handler: async (ctx, args) => {
     const resolucion = await resolverNegocioEscritura(ctx);
+    if (resolucion.modo === "demo") await consumirLimite(ctx, `cancelar:${resolucion.negocioId}`, 10);
     return await cancelarCobro(ctx, resolucion.negocioId, resolucion.modo, resolucion.actor, args.publicId, args.claveIdempotencia);
   },
 });
@@ -122,6 +131,6 @@ export const reintentar = mutation({
   handler: async (ctx, args) => {
     const resolucion = await resolverNegocioEscritura(ctx);
     const peyConfigPresente = resolucion.modo === "live" ? peyConfiguracionDisponible() : true;
-    return await reintentarCobro(ctx, resolucion.negocioId, resolucion.modo, resolucion.actor, args.publicId, args.claveIdempotencia, peyConfigPresente);
+    return await reintentarCobro(ctx, resolucion.negocioId, resolucion.modo, resolucion.actor, args.publicId, args.claveIdempotencia, peyConfigPresente, () => limitarReserva(ctx, resolucion));
   },
 });

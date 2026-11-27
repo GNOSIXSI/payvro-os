@@ -1,10 +1,11 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Browser, type BrowserContext } from "@playwright/test";
 import { spawn } from "node:child_process";
 import { generateKeyPairSync, sign } from "node:crypto";
 import { cp, glob, mkdtemp, rm, symlink } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { createRequire } from "node:module";
 import { once } from "node:events";
 import { convexTest } from "convex-test";
 import { anyApi, makeFunctionReference } from "convex/server";
@@ -12,7 +13,11 @@ import { convexToJson, ConvexError } from "convex/values";
 import { createServer as createViteServer } from "vite";
 import type schema from "../convex/schema";
 
-const issuer = "https://clerk.example.invalid";
+const require = createRequire(import.meta.url);
+const clerkDist = {
+  "clerk-js": dirname(require.resolve("@clerk/clerk-js")),
+  ui: dirname(require.resolve("@clerk/ui")),
+};
 const correo = "dueno@example.invalid";
 const identidades = new Map([
   ["permitido", { email: correo, emailVerified: true }],
@@ -20,18 +25,67 @@ const identidades = new Map([
   ["no-verificado", { email: correo, emailVerified: false }],
 ]);
 
+async function bloquearWebSocketsExternos(context: BrowserContext, baseURL: string) {
+  const app = new URL(baseURL);
+  await context.routeWebSocket((url) => url.host !== app.host, (socket) => socket.close());
+}
+
+async function probarHidratacion(browser: Browser, baseURL: string, issuer: string) {
+  const context = await browser.newContext({ baseURL, javaScriptEnabled: true, serviceWorkers: "block" });
+  try {
+    await bloquearWebSocketsExternos(context, baseURL);
+    await context.route("**/*", async (route) => {
+      const { origin, pathname } = new URL(route.request().url());
+      if (origin === baseURL) return route.continue();
+      if (origin !== issuer) return route.abort();
+      const headers = { "access-control-allow-origin": baseURL, "access-control-allow-credentials": "true" };
+      // Clerk expects HTTPS for the loopback issuer; fulfill locally without a TLS server.
+      const asset = pathname.match(/^\/npm\/@clerk\/(clerk-js|ui)@[\w.-]+\/dist\/([\w.-]+\.js)$/);
+      if (asset) {
+        const [, paquete, archivo] = asset;
+        const dist = paquete === "clerk-js" ? clerkDist["clerk-js"] : clerkDist.ui;
+        return route.fulfill({ headers, contentType: "text/javascript", path: join(dist, archivo) });
+      }
+      if (pathname === "/v1/environment") {
+        return route.fulfill({ headers, json: {
+          object: "environment",
+          auth_config: { single_session_mode: true },
+          display_config: { application_name: "PAYVRO Ejemplo", instance_environment_type: "production", branded: false },
+          user_settings: { attributes: {
+            email_address: { enabled: true, required: true, used_for_first_factor: true, first_factors: ["email_code"], verifications: ["email_code"] },
+          } },
+        } });
+      }
+      if (pathname === "/v1/client") {
+        return route.fulfill({ headers, json: { response: { object: "client", id: "client_fixture", sessions: [] } } });
+      }
+      return route.abort();
+    });
+    const page = await context.newPage();
+    await page.goto("/panel/nuevo");
+    await expect(page).toHaveURL(/\/entrar(?:\?|$)/);
+    const campoCorreo = page.getByRole("textbox", { name: /email address|correo electrónico/i });
+    await expect(campoCorreo).toBeEditable({ timeout: 30_000 });
+    await campoCorreo.fill("visitante@example.invalid");
+    await expect(campoCorreo).toHaveValue("visitante@example.invalid");
+    await expect(page.getByRole("button", { name: "Crear cobro" })).toHaveCount(0);
+  } finally {
+    await context.close();
+  }
+}
+
 test("la sesión Clerk abre el panel solo si Convex autoriza al dueño; el pagador no inicia sesión", async ({ browser }) => {
   test.setTimeout(120_000);
   const raiz = resolve(import.meta.dirname, "..");
   const temporal = await mkdtemp(join(tmpdir(), "payvro-dueno-"));
   const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
-  const jwt = (claims: Record<string, unknown>, categoria: "sesion" | "plantilla") => {
+  const jwt = (issuer: string, claims: Record<string, unknown>, categoria: "sesion" | "plantilla") => {
     const base64 = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
     const now = Math.floor(Date.now() / 1000);
     const contenido = `${base64({ alg: "RS256", typ: "JWT", kid: "fixture", cat: categoria === "sesion" ? "cl_B7d4PD111AAA" : "cl_B7d4PD222AAA" })}.${base64({ iss: issuer, iat: now, nbf: now - 1, exp: now + 90, ...claims })}`;
     return `${contenido}.${sign("RSA-SHA256", Buffer.from(contenido), privateKey).toString("base64url")}`;
   };
-  const tokens = new Map([...identidades.keys()].map((id) => [id, jwt({ sub: id, aud: "convex" }, "plantilla")]));
+  const tokens = new Map<string, string>();
   const vite = await createViteServer({ root: raiz, configFile: false, server: { middlewareMode: true, ws: false, watch: null } });
   const modulos: Record<string, () => Promise<unknown>> = {};
   for await (const archivo of glob("convex/**/*.ts", { cwd: raiz })) modulos[archivo] = () => vite.ssrLoadModule(`/${archivo}`);
@@ -75,7 +129,10 @@ test("la sesión Clerk abre el panel solo si Convex autoriza al dueño; el pagad
   await once(proveedor, "listening");
   const direccion = proveedor.address();
   if (!direccion || typeof direccion === "string") throw new Error("Proveedor de prueba sin puerto TCP");
-  const loopback = `http://127.0.0.1:${direccion.port}`;
+  const clerkHost = `127.0.0.1:${direccion.port}`;
+  const loopback = `http://${clerkHost}`;
+  const issuer = `https://${clerkHost}`;
+  for (const id of identidades.keys()) tokens.set(id, jwt(issuer, { sub: id, aud: "convex" }, "plantilla"));
   let next: ReturnType<typeof spawn> | undefined;
   let errores = "";
   try {
@@ -92,7 +149,7 @@ test("la sesión Clerk abre el panel solo si Convex autoriza al dueño; el pagad
         PATH: process.env.PATH, HOME: temporal, NODE_ENV: "development", NEXT_TELEMETRY_DISABLED: "1",
         NODE_OPTIONS: "--dns-result-order=ipv4first",
         NEXT_PUBLIC_CONVEX_URL: loopback,
-        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ["pk", "live", Buffer.from("clerk.example.invalid$").toString("base64url")].join("_"),
+        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ["pk", "live", Buffer.from(`${clerkHost}$`).toString("base64url")].join("_"),
         CLERK_SECRET_KEY: ["sk", "live", Buffer.from("fixture-no-provider").toString("hex")].join("_"),
         CLERK_API_URL: loopback,
       },
@@ -109,9 +166,11 @@ test("la sesión Clerk abre el panel solo si Convex autoriza al dueño; el pagad
       next!.once("exit", (code) => fail(new Error(`Next terminó antes de servir (exit=${code})`)));
       next!.stderr!.on("data", (data) => { errores = (errores + String(data)).slice(-4000); });
     });
-    const context = await browser.newContext({ baseURL, javaScriptEnabled: false });
+    await test.step("Clerk hidrata el formulario en /entrar después de la redirección, con JavaScript", () => probarHidratacion(browser, baseURL, issuer));
+    const context = await browser.newContext({ baseURL, javaScriptEnabled: false, serviceWorkers: "block" });
     try {
-      await context.route("**/*", (route) => route.request().url().startsWith(`${baseURL}/`) ? route.continue() : route.abort());
+      await bloquearWebSocketsExternos(context, baseURL);
+      await context.route("**/*", (route) => new URL(route.request().url()).origin === baseURL ? route.continue() : route.abort());
       const page = await context.newPage();
       await page.goto("/panel/nuevo");
       await expect(page).toHaveURL(/\/entrar(?:\?|$)/);
@@ -124,7 +183,7 @@ test("la sesión Clerk abre el panel solo si Convex autoriza al dueño; el pagad
       for (const id of identidades.keys()) {
         await context.addCookies([
           { name: "__client_uat", url: baseURL, value: String(Math.floor(Date.now() / 1000) - 10) },
-          { name: "__session", url: baseURL, value: jwt({ sid: `ses_${id}`, sub: id, azp: baseURL, sts: "active" }, "sesion") },
+          { name: "__session", url: baseURL, value: jwt(issuer, { sid: `ses_${id}`, sub: id, azp: baseURL, sts: "active" }, "sesion") },
         ]);
         await page.goto("/panel/nuevo");
         if (id === "permitido") {

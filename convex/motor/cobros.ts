@@ -7,7 +7,6 @@ import { transicionarCobro, transicionarIntento } from "@payvro/engine";
 import type { EstadoCobro } from "@payvro/engine";
 import { nuevoId } from "@payvro/engine/ids";
 import type { Actor, Modo } from "./puertos";
-import { consumirLimite } from "./limites";
 import { registrar } from "./bitacora";
 import { nuevoIntentoId } from "./intentos";
 
@@ -51,6 +50,7 @@ export async function crearCobro(
   modo: Modo,
   actor: Actor,
   peyConfigPresente: boolean,
+  limitarReserva: () => Promise<void>,
 ): Promise<{ publicId: string; folio: number; estado: EstadoCobro }> {
   const tipo = validarEntrada(entrada);
   const negocio = await ctx.db.get(negocioId);
@@ -76,7 +76,8 @@ export async function crearCobro(
   if (negocio.cobrosPausados) {
     throw new ConvexError({ codigo: "COBROS_PAUSADOS", mensaje: "La creación de cobros está pausada." });
   }
-  if (modo === "demo") await consumirLimite(ctx, `crear:${negocioId}`, 10);
+  // Charge the write only after a valid idempotent replay has returned.
+  await limitarReserva();
   const ahora = Date.now();
   const folio = negocio.folioSiguiente;
   await ctx.db.patch(negocioId, { folioSiguiente: folio + 1 });
@@ -158,6 +159,7 @@ export async function reintentarCobro(
   publicId: string,
   claveIdempotencia: string,
   peyConfigPresente: boolean,
+  limitarReserva: () => Promise<void>,
 ): Promise<{ publicId: string; estado: "reservado" | "creado" | "pagado" | "incierto" | "fallido" | "descartado" }> {
   validarClave(claveIdempotencia);
   const porClave = await ctx.db.query("intentos").withIndex("by_negocio_clave", (q) => q.eq("negocioId", negocioId).eq("claveIdempotencia", claveIdempotencia)).unique();
@@ -183,7 +185,7 @@ export async function reintentarCobro(
     exigirCuentaLista(negocio, peyConfigPresente);
   }
   if (negocio.cobrosPausados) throw new ConvexError({ codigo: "COBROS_PAUSADOS", mensaje: "La creación de cobros está pausada." });
-  if (modo === "demo") await consumirLimite(ctx, `crear:${negocioId}`, 10);
+  await limitarReserva();
   const ahora = Date.now();
   const intentoId = await ctx.db.insert("intentos", {
     negocioId, modo, publicId: nuevoIntentoId(), cobroId: cobro._id,
