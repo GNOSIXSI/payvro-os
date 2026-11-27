@@ -74,6 +74,8 @@ function leerInforme() {
     medido[dato.severity]++;
     for (const via of dato.via) {
       if (typeof via === "string" ? !hallazgos.has(via) : !registro(via) || !severidades.includes(via.severity) || !Number.isSafeInteger(via.source) || via.source <= 0) throw invalido();
+      // npm's package severity cannot be lower than that of a direct advisory.
+      if (typeof via !== "string" && severidades.indexOf(via.severity) > severidades.indexOf(dato.severity)) throw invalido();
     }
   }
   if (conteo.total !== hallazgos.size || severidades.some((nivel) => conteo[nivel] !== medido[nivel]) ||

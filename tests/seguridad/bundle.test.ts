@@ -52,16 +52,18 @@ function excepciones(datos: unknown[]) {
   writeFileSync(join(dir, "docs/auditoria-excepciones.md"), `# Excepciones\n\n\`\`\`json\n${JSON.stringify(datos)}\n\`\`\`\n`);
 }
 
-function reporte(tipo: "none" | "high" | "critical" | "meta" | "error" | "moderate" = "none") {
-  const severity = tipo === "critical" || tipo === "moderate" ? tipo : "high";
-  const finding = { name: "paquete-ejemplo", severity, via: [{ source: 12345, severity }], range: "<2.0.0" };
+function reporte(tipo: "none" | "high" | "critical" | "meta" | "error" | "moderate" | "high-subestimado" | "mixed" = "none") {
+  const severity = tipo === "high-subestimado" ? "moderate" : tipo === "critical" || tipo === "moderate" ? tipo : "high";
+  const via = [{ source: 12345, severity: tipo === "high-subestimado" ? "high" : severity }];
+  if (tipo === "mixed") via.push({ source: 12346, severity: "moderate" });
+  const finding = { name: "paquete-ejemplo", severity, via, range: "<2.0.0" };
   const vulnerabilities = tipo === "error" ? undefined : tipo === "none" ? {} : {
     "paquete-ejemplo": finding,
     ...(tipo === "meta" ? { "consumidor-ejemplo": { name: "consumidor-ejemplo", severity: "high", via: ["paquete-ejemplo"], range: "*" } } : {}),
   };
-  const high = tipo === "meta" ? 2 : tipo === "high" ? 1 : 0;
+  const high = tipo === "meta" ? 2 : tipo === "high" || tipo === "mixed" ? 1 : 0;
   const critical = tipo === "critical" ? 1 : 0;
-  const moderate = tipo === "moderate" ? 1 : 0;
+  const moderate = tipo === "moderate" || tipo === "high-subestimado" ? 1 : 0;
   writeFileSync(join(dir, "audit-fixture.json"), JSON.stringify(tipo === "error" ? { error: { code: "E503" } } : {
     auditReportVersion: 2, vulnerabilities, metadata: { vulnerabilities: { info: 0, low: 0, moderate, high, critical, total: moderate + high + critical } },
   }));
@@ -137,6 +139,14 @@ it("un informe inválido o un exit incoherente de npm fallan cerrado", () => {
     expect(gate(tipo, { AUDIT_STATUS })).toMatchObject({ exit: 1, output: expect.stringContaining("Informe npm audit inválido") });
   }
   expect(gate("moderate")).toMatchObject({ exit: 0, output: expect.stringContaining("secrets-fixture-ran") });
+});
+
+it("no admite un advisory high bajo una fila moderate ni exige excepción para advisories moderate", () => {
+  expect(gate("high-subestimado")).toMatchObject({ exit: 1, output: expect.stringContaining("Informe npm audit inválido") });
+  excepciones([excepcion]);
+  expect(gate("mixed")).toMatchObject({ exit: 0, output: expect.stringContaining("secrets-fixture-ran") });
+  excepciones([]);
+  expect(gate("mixed")).toMatchObject({ exit: 1, output: expect.stringContaining("sin excepción vigente") });
 });
 
 it("no considera limpio un bundle vacío ni uno que contiene un enlace no escaneable", () => {
