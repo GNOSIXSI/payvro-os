@@ -47,6 +47,24 @@ async function cobrosDemo(t: Harness, cantidad: number, estado: "borrador" | "es
   });
 }
 
+it("exige clasificar toda mutación o acción pública para la cobertura de límites", async () => {
+  const modulos = import.meta.glob<Record<string, unknown>>("../../convex/**/*.ts");
+  const publicas: string[] = [];
+  for (const [ruta, cargar] of Object.entries(modulos)) {
+    for (const [nombre, funcion] of Object.entries(await cargar())) {
+      if (typeof funcion === "function" && "isPublic" in funcion && funcion.isPublic === true &&
+        (("isMutation" in funcion && funcion.isMutation === true) || ("isAction" in funcion && funcion.isAction === true))) {
+        publicas.push(`${ruta.slice("../../convex/".length, -3)}:${nombre}`);
+      }
+    }
+  }
+  expect(publicas.sort()).toEqual([
+    "cobros:cancelar", "cobros:crear", "cobros:reintentar", "demo:simularPago", "negocio:actualizarPerfil",
+    // Bootstrap idempotent: creates the DEMO singleton if and only if it is missing.
+    "negocio:preparar", "publico:vigilar",
+  ]);
+});
+
 it("comparte la cuota DEMO entre crear y reintentar, sin cobrar un replay de creación", async () => {
   const t = nuevoLiveHarness();
   const pendientes = await cobrosDemo(t, 7, "borrador");
