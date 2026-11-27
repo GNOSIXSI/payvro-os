@@ -7,6 +7,7 @@ import { afterEach, beforeEach, expect, it } from "vitest";
 
 const raiz = process.cwd();
 const canario = "pv04-example-canary-not-a-credential";
+const canarioPredeterminado = "payvro-ci-canary-not-a-credential";
 const vencimiento = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
 const excepcion = { paquete: "paquete-ejemplo", advisory: 12345, vence: vencimiento, motivo: "Mitigación temporal revisada; retirar cuando salga el parche." };
 let dir: string;
@@ -25,9 +26,17 @@ case "$*" in
   'run bundle:revisar') exec node scripts/revisar-bundle.mjs ;;
   'run audit') exec node scripts/revisar-bundle.mjs --audit ;;
   'audit --omit=dev --audit-level=high --json') cat audit-fixture.json; exit "$AUDIT_STATUS" ;;
-  'run build') rm -f .next/static/chunks/e2e.js; printf '%s\\n' 'build-fixture-marker' "\${LOG_FIXTURE:-output normal}"; exit "\${BUILD_STATUS:-0}" ;;
+  'run build')
+    rm -f .next/static/chunks/e2e.js
+    if [[ -n "\${VERIFICAR_CANARIO:-}" && "$PAYVRO_SENTINEL" != "$VERIFICAR_CANARIO" ]]; then
+      echo 'el build no recibió el canario esperado'; exit 42
+    fi
+    printf '%s\\n' 'build-fixture-marker' "\${LOG_FIXTURE:-output normal}"; exit "\${BUILD_STATUS:-0}" ;;
   'run secrets') echo 'secrets-fixture-ran' ;;
   'run e2e')
+    if [[ -n "\${VERIFICAR_CANARIO:-}" && "$PAYVRO_SENTINEL" != "$VERIFICAR_CANARIO" ]]; then
+      echo 'la reconstrucción E2E no recibió el canario esperado'; exit 42
+    fi
     if [[ -n "\${E2E_BUNDLE_FIXTURE:-}" ]]; then
       printf '%s\\n' "$E2E_BUNDLE_FIXTURE" > .next/static/chunks/e2e.js
     fi ;;
@@ -59,7 +68,7 @@ function reporte(tipo: "none" | "high" | "critical" | "meta" | "error" | "modera
   return tipo === "error" || high + critical > 0 ? "1" : "0";
 }
 
-function gate(tipo: Parameters<typeof reporte>[0] = "none", env?: Record<string, string>) {
+function gate(tipo: Parameters<typeof reporte>[0] = "none", env?: Record<string, string | undefined>) {
   const result = spawnSync("bash", ["scripts/gate.sh"], {
     cwd: dir, encoding: "utf8", timeout: 15_000,
     env: { ...process.env, PATH: `${join(dir, "bin")}:${process.env.PATH}`, PAYVRO_SENTINEL: canario, AUDIT_STATUS: reporte(tipo), ...env },
@@ -84,6 +93,18 @@ it.each([canario, "PEY_API_KEY", "PEY_WEBHOOK_SECRET", "CLERK_SECRET_KEY", "CONV
 it("revisa también el bundle producido durante E2E", () => {
   expect(gate("none", { E2E_BUNDLE_FIXTURE: canario })).toMatchObject({ exit: 1, output: expect.stringContaining("Marcador prohibido en el bundle") });
   expect(gate("none", { E2E_BUNDLE_FIXTURE: "normal" })).toMatchObject({ exit: 0, output: expect.stringContaining("secrets-fixture-ran") });
+});
+
+it.each([
+  [undefined, canarioPredeterminado],
+  [canario, canario],
+])("propaga el canario del gate a ambos builds y revisa sus salidas (%s)", (PAYVRO_SENTINEL, esperado) => {
+  const entorno = { PAYVRO_SENTINEL, VERIFICAR_CANARIO: esperado };
+  expect(gate("none", entorno)).toMatchObject({ exit: 0, output: expect.stringContaining("secrets-fixture-ran") });
+  const log = gate("none", { ...entorno, LOG_FIXTURE: esperado });
+  expect(log).toMatchObject({ exit: 1, output: expect.stringContaining("Marcador prohibido en logs del gate") });
+  expect(log.output).not.toContain(esperado);
+  expect(gate("none", { ...entorno, E2E_BUNDLE_FIXTURE: esperado })).toMatchObject({ exit: 1, output: expect.stringContaining("Marcador prohibido en el bundle") });
 });
 
 it("no publica logs con el canario, incluso si el comando falla; limpia la salida y preserva su exit", () => {
